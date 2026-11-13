@@ -18,21 +18,28 @@ public struct LineSegment: Sendable, Identifiable {
 }
 
 public enum Segments {
-    /// Splits a sorted line into solid runs and dashed bridges where two points are more than `maxGap` apart.
+    /// Splits a sorted line into runs where neighbours are at most `maxGap` apart. Runs of two or more points are
+    /// measured and drawn solid. The link between two such runs is a guess and drawn dashed; a link that touches a
+    /// lone point (a reset, or one reading) is drawn solid.
     public static func split(_ points: [ChartPoint], maxGap: TimeInterval) -> [LineSegment] {
-        guard var run = points.first.map({ [$0] }) else { return [] }
-        var result: [LineSegment] = []
-        for p in points.dropFirst() {
-            let prev = run[run.count - 1]
-            if p.at.timeIntervalSince(prev.at) > maxGap {
-                if run.count > 1 { result.append(LineSegment(id: result.count, points: run, dashed: false)) }
-                result.append(LineSegment(id: result.count, points: [prev, p], dashed: true))
-                run = [p]
+        var runs: [[ChartPoint]] = []
+        for p in points {
+            if let prev = runs.last?.last, p.at.timeIntervalSince(prev.at) <= maxGap {
+                runs[runs.count - 1].append(p)
             } else {
-                run.append(p)
+                runs.append([p])
             }
         }
-        if run.count > 1 || result.isEmpty { result.append(LineSegment(id: result.count, points: run, dashed: false)) }
+        var result: [LineSegment] = []
+        for (i, run) in runs.enumerated() {
+            if run.count > 1 { result.append(LineSegment(id: result.count, points: run, dashed: false)) }
+            guard i + 1 < runs.count, let last = run.last, let first = runs[i + 1].first else { continue }
+            let dashed = run.count > 1 && runs[i + 1].count > 1
+            result.append(LineSegment(id: result.count, points: [last, first], dashed: dashed))
+        }
+        if result.isEmpty, let only = runs.first {
+            result.append(LineSegment(id: 0, points: only, dashed: false))
+        }
         return result
     }
 }

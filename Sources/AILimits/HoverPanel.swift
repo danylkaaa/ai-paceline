@@ -40,6 +40,12 @@ final class HoverPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
+    /// Takes focus on a click inside, so native controls act on that first click.
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown, !isKeyWindow { makeKey() }
+        super.sendEvent(event)
+    }
+
     override func resignKey() {
         super.resignKey()
         onResignKey()

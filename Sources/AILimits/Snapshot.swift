@@ -4,7 +4,11 @@ import SwiftUI
 /// `AILimits --snapshot <dir>`: fetches real data, writes one PNG per tab, and exits. Used to check the UI.
 @MainActor
 enum Snapshot {
+    /// ImageRenderer cannot draw AppKit views, so snapshot mode leaves them out.
+    nonisolated(unsafe) static var active = false
+
     static func run(into dir: URL) {
+        active = true
         let store = UsageStore()
         let ui = PanelState()
         ui.scrolls = false

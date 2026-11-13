@@ -92,12 +92,15 @@ struct WeekChart: View {
 struct OverviewChart: View {
     var history: History
     var now: Date
+    @ObservedObject var zoom: ChartZoom
 
     var body: some View {
-        let from = now.addingTimeInterval(-7 * 86400)
+        let range = zoom.range(endingAt: now)
+        let from = range.lowerBound
+        VStack(alignment: .leading, spacing: 6) {
         Chart {
             ForEach(Provider.allCases) { provider in
-                ForEach(history.windows(provider).filter { $0.resetsAt > from }) { w in
+                ForEach(history.windows(provider).filter { $0.resetsAt > from && $0.start < range.upperBound }) { w in
                     ForEach(Segments.split(Self.visible(w.leftLine(now: now), from: from), maxGap: maxGap)) { seg in
                         ForEach(seg.points, id: \.at) { p in
                             LineMark(x: .value("Time", p.at), y: .value("Left", p.value),
@@ -110,13 +113,25 @@ struct OverviewChart: View {
             }
         }
         .chartForegroundStyleScale(["Claude": Color(Palette.base(.claude)), "Codex": Color(Palette.base(.codex))])
-        .chartXScale(domain: from...now)
+        .chartXScale(domain: range)
         .chartPlotStyle { $0.clipped() }
         .chartYScale(domain: 0...100)
         .chartXAxis {
-            AxisMarks(values: .stride(by: .day)) { _ in
-                AxisGridLine().foregroundStyle(.quaternary)
-                AxisValueLabel(format: .dateTime.weekday(.abbreviated), anchor: .topLeading)
+            if zoom.days <= 2 {
+                AxisMarks(values: .stride(by: .hour, count: 6)) { _ in
+                    AxisGridLine().foregroundStyle(.quaternary)
+                    AxisValueLabel(format: .dateTime.hour(), anchor: .topLeading)
+                }
+            } else if zoom.days <= 7 {
+                AxisMarks(values: .stride(by: .day)) { _ in
+                    AxisGridLine().foregroundStyle(.quaternary)
+                    AxisValueLabel(format: .dateTime.weekday(.abbreviated), anchor: .topLeading)
+                }
+            } else {
+                AxisMarks(values: Self.dateTicks(range, every: zoom.days / 5)) { _ in
+                    AxisGridLine().foregroundStyle(.quaternary)
+                    AxisValueLabel(format: .dateTime.day().month(.abbreviated), anchor: .topLeading)
+                }
             }
         }
         .chartYAxis {
@@ -127,6 +142,16 @@ struct OverviewChart: View {
         }
         .chartLegend(position: .bottom, alignment: .leading)
         .frame(height: 140)
+        .zoomable(zoom)
+        ZoomHint(zoom: zoom)
+        }
+    }
+
+    /// Ticks spaced `every` days, kept clear of both ends so no label is cut off.
+    private static func dateTicks(_ range: ClosedRange<Date>, every days: Double) -> [Date] {
+        let step = days * 86400
+        return Array(stride(from: range.lowerBound.addingTimeInterval(step / 2),
+                            through: range.upperBound.addingTimeInterval(-step / 2), by: step))
     }
 
     /// Drops points before `from`, keeping one so the line enters the chart from its left edge.

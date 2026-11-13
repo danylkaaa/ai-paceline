@@ -10,15 +10,18 @@ enum Metric: String, CaseIterable, Identifiable {
 struct TokenSection: View {
     @ObservedObject var store: UsageStore
     var provider: Provider
+    @ObservedObject var zoom: ChartZoom
     @AppStorage("metric") private var metric: Metric = .tokens
 
     var body: some View {
         if let usage = store.tokens[provider] {
-            Section(title: "Last 30 days") {
+            let days = DayRange(zoom: zoom, now: store.now)
+            let rows = usage.daily.filter { days.contains($0.day) }
+            Section(title: "Tokens and cost") {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .firstTextBaseline) {
-                        Stat(label: "Tokens", value: Fmt.tokens(usage.totalTokens))
-                        Stat(label: "Est. API cost", value: Fmt.money(usage.totalCost))
+                        Stat(label: "Tokens", value: Fmt.tokens(rows.reduce(0) { $0 + $1.tokens }))
+                        Stat(label: "Est. API cost", value: Fmt.money(rows.reduce(0) { $0 + $1.cost }))
                         Spacer()
                         Picker("", selection: $metric) {
                             ForEach(Metric.allCases) { Text($0.rawValue).tag($0) }
@@ -27,13 +30,15 @@ struct TokenSection: View {
                         .labelsHidden()
                         .frame(width: 130)
                     }
-                    DailyChart(provider: provider, usage: usage, metric: metric)
+                    DailyChart(provider: provider, rows: rows, costPerModel: usage.costPerModel, metric: metric, days: days)
+                        .zoomable(zoom)
+                    ZoomHint(zoom: zoom)
                     Text("Cost is tokens × public API prices, not your bill.")
                         .font(.caption2).foregroundStyle(.tertiary)
                 }
             }
             if !usage.projects.isEmpty {
-                Section(title: "Top projects") { ProjectList(provider: provider, projects: usage.projects) }
+                Section(title: "Top projects, last 60 days") { ProjectList(provider: provider, projects: usage.projects) }
             }
         } else if let error = store.tokenErrors[provider] {
             Notice(text: error)
@@ -46,23 +51,43 @@ struct TokenSection: View {
     }
 }
 
+/// Whole days shown by a token chart: the zoom window, ending today minus the zoom offset.
+struct DayRange {
+    var first: Date
+    var last: Date
+    var count: Int
+
+    @MainActor init(zoom: ChartZoom, now: Date) {
+        last = Calendar.current.startOfDay(for: now).addingTimeInterval(-zoom.offsetDays * 86400)
+        count = Int(zoom.days)
+        first = last.addingTimeInterval(-Double(count - 1) * 86400)
+    }
+
+    func contains(_ day: Date) -> Bool { day >= first && day <= last }
+}
+
 struct DailyChart: View {
     var provider: Provider
-    var usage: TokenUsage
+    var rows: [DailyModelUsage]
+    var costPerModel: Bool
     var metric: Metric
+    var days: DayRange
 
     var body: some View {
         let models = modelsByVolume
-        Chart(usage.daily) { row in
+        let step = max(1, days.count / 4)
+        Chart(rows) { row in
             BarMark(x: .value("Day", row.day, unit: .day),
                     y: .value(metric.rawValue, metric == .tokens ? row.tokens : row.cost))
                 .foregroundStyle(by: .value("Model", seriesName(row.model)))
                 .cornerRadius(2)
         }
         .chartForegroundStyleScale(domain: models, range: models.indices.map { Color(Palette.series(provider, index: $0)) })
-        .chartXScale(domain: firstDay...lastDay.addingTimeInterval(86400))
+        .chartXScale(domain: days.first...days.last.addingTimeInterval(86400))
         .chartXAxis {
-            AxisMarks(values: [27, 20, 13, 6].map { lastDay.addingTimeInterval(-Double($0) * 86400) }) { _ in
+            AxisMarks(values: stride(from: days.count - 1 - step / 2, to: 0, by: -step).map {
+                days.last.addingTimeInterval(-Double($0) * 86400)
+            }) { _ in
                 AxisGridLine().foregroundStyle(.quaternary)
                 AxisValueLabel(format: .dateTime.day().month(.abbreviated))
             }
@@ -83,17 +108,14 @@ struct DailyChart: View {
 
     /// Codex reports cost per day only, so the cost view shows one series.
     private func seriesName(_ model: String) -> String {
-        metric == .cost && !usage.costPerModel ? "All models" : model
+        metric == .cost && !costPerModel ? "All models" : model
     }
 
     private var modelsByVolume: [String] {
         var totals: [String: Double] = [:]
-        for row in usage.daily { totals[seriesName(row.model), default: 0] += metric == .tokens ? row.tokens : row.cost }
+        for row in rows { totals[seriesName(row.model), default: 0] += metric == .tokens ? row.tokens : row.cost }
         return totals.sorted { $0.value > $1.value }.map(\.key)
     }
-
-    private var lastDay: Date { Calendar.current.startOfDay(for: Date()) }
-    private var firstDay: Date { lastDay.addingTimeInterval(-29 * 86400) }
 }
 
 struct ProjectList: View {

@@ -28,6 +28,10 @@ final class PanelState: ObservableObject {
     @Published var loginNote: String?
     @Published var contentHeight: CGFloat = 300
     @Published var maxPanelHeight: CGFloat = 800
+    let overviewZoom = ChartZoom(levels: [1, 2, 3, 7, 14, 30, 60], initial: 7)
+    let tokenZoom: [Provider: ChartZoom] = Dictionary(uniqueKeysWithValues: Provider.allCases.map {
+        ($0, ChartZoom(levels: [7, 14, 30, 60], initial: 30))
+    })
     /// Off only for snapshots: ImageRenderer does not draw ScrollView contents.
     var scrolls = true
 }

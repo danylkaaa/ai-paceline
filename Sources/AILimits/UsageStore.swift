@@ -79,8 +79,8 @@ final class UsageStore: ObservableObject {
     }
 
     private func refreshTokens() async {
-        async let c = Self.loadTokens(.claude) { try await CCUsage.claude() }
-        async let x = Self.loadTokens(.codex) { try await CCUsage.codex() }
+        async let c = Self.loadTokens(.claude) { try await CCUsage.claude(days: 60) }
+        async let x = Self.loadTokens(.codex) { try await CCUsage.codex(days: 60) }
         for (provider, result) in await [(Provider.claude, c), (.codex, x)] {
             switch result {
             case .success(let usage):

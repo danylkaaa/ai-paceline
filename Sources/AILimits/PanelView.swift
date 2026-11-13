@@ -17,8 +17,19 @@ struct PanelView: View {
         VStack(alignment: .leading, spacing: 14) {
             if !ui.showSettings { TabBar(tab: $tab) }
 
+            let maxContent = max(200, ui.maxPanelHeight - 130)
             if !ui.scrolls {
                 content
+            } else if ui.contentHeight <= maxContent {
+                // Fits: no scroll area, so no scroll bar.
+                content
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: ContentHeight.self, value: geo.size.height)
+                    })
+                    .onPreferenceChange(ContentHeight.self) { height in
+                        MainActor.assumeIsolated { contentHeightChanged(height) }
+                    }
             } else {
             // The scroll area takes the content's height, up to what fits on screen.
             ScrollView(.vertical) {
@@ -28,13 +39,9 @@ struct PanelView: View {
                         Color.clear.preference(key: ContentHeight.self, value: geo.size.height)
                     })
             }
-            .frame(height: min(ui.contentHeight, max(200, ui.maxPanelHeight - 130)))
+            .frame(height: maxContent)
             .onPreferenceChange(ContentHeight.self) { height in
-                MainActor.assumeIsolated {
-                    guard abs(ui.contentHeight - height) > 0.5 else { return }
-                    ui.contentHeight = height
-                    DispatchQueue.main.async(execute: onResize)
-                }
+                MainActor.assumeIsolated { contentHeightChanged(height) }
             }
             }
 
@@ -45,14 +52,20 @@ struct PanelView: View {
         .frame(width: 440, alignment: .leading)
     }
 
+    private func contentHeightChanged(_ height: CGFloat) {
+        guard abs(ui.contentHeight - height) > 0.5 else { return }
+        ui.contentHeight = height
+        DispatchQueue.main.async(execute: onResize)
+    }
+
     @ViewBuilder private var content: some View {
         if ui.showSettings {
             SettingsView(ui: ui)
         } else {
             switch tab {
-            case .overview: OverviewTab(store: store)
-            case .claude: ProviderTab(store: store, provider: .claude)
-            case .codex: ProviderTab(store: store, provider: .codex)
+            case .overview: OverviewTab(store: store, zoom: ui.overviewZoom)
+            case .claude: ProviderTab(store: store, provider: .claude, zoom: ui.tokenZoom[.claude]!)
+            case .codex: ProviderTab(store: store, provider: .codex, zoom: ui.tokenZoom[.codex]!)
             }
         }
     }
@@ -63,54 +76,61 @@ private struct ContentHeight: PreferenceKey {
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
 }
 
-/// Tabs as plain buttons: one click switches, even while the panel is not the key window.
+/// Native segmented control that acts on the first click, so one click switches tabs even before the panel has focus.
 struct TabBar: View {
     @Binding var tab: Tab
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(Tab.allCases) { t in
-                TabButton(title: t.rawValue, selected: t == tab) { tab = t }
-                    .help("Click to show \(t == .overview ? "both providers" : t.rawValue)")
+        if Snapshot.active {
+            Picker("", selection: $tab) {
+                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        } else {
+            NativeTabs(tab: $tab).help("Click a tab to switch")
         }
-        .padding(3)
-        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
-struct TabButton: View {
-    var title: String
-    var selected: Bool
-    var action: () -> Void
-    @StateObject private var hover = HoverFlag()
+private struct NativeTabs: NSViewRepresentable {
+    @Binding var tab: Tab
 
-    var body: some View {
-        Text(title)
-            .font(.callout.weight(selected ? .semibold : .regular))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(selected ? AnyShapeStyle(.background.opacity(0.9))
-                          : hover.on ? AnyShapeStyle(.primary.opacity(0.08)) : AnyShapeStyle(.clear))
-                    .shadow(color: .black.opacity(selected ? 0.15 : 0), radius: 1, y: 0.5)
-            )
-            .contentShape(Rectangle())
-            .onHover { hover.on = $0; if $0 { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() } }
-            .onTapGesture(perform: action)
+    func makeCoordinator() -> Coordinator { Coordinator(tab: $tab) }
+
+    func makeNSView(context: Context) -> FirstClickSegmentedControl {
+        let control = FirstClickSegmentedControl(labels: Tab.allCases.map(\.rawValue), trackingMode: .selectOne,
+                                                 target: context.coordinator, action: #selector(Coordinator.changed(_:)))
+        control.segmentDistribution = .fillEqually
+        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        return control
+    }
+
+    func updateNSView(_ control: FirstClickSegmentedControl, context: Context) {
+        context.coordinator.tab = $tab
+        control.selectedSegment = Tab.allCases.firstIndex(of: tab) ?? 0
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var tab: Binding<Tab>
+        init(tab: Binding<Tab>) { self.tab = tab }
+
+        @objc func changed(_ sender: NSSegmentedControl) {
+            tab.wrappedValue = Tab.allCases[max(0, sender.selectedSegment)]
+        }
     }
 }
 
-@MainActor
-final class HoverFlag: ObservableObject {
-    @Published var on = false
+final class FirstClickSegmentedControl: NSSegmentedControl {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
 
 // MARK: - Overview
 
 struct OverviewTab: View {
     @ObservedObject var store: UsageStore
+    var zoom: ChartZoom
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -119,8 +139,8 @@ struct OverviewTab: View {
                     SummaryCard(provider: provider, status: store.status(provider), now: store.now)
                 }
             }
-            Section(title: "Weekly limit left, last 7 days") {
-                OverviewChart(history: store.history, now: store.now)
+            Section(title: "Weekly limit left") {
+                OverviewChart(history: store.history, now: store.now, zoom: zoom)
             }
         }
     }
@@ -174,6 +194,7 @@ struct SummaryCard: View {
 struct ProviderTab: View {
     @ObservedObject var store: UsageStore
     var provider: Provider
+    var zoom: ChartZoom
 
     var body: some View {
         let status = store.status(provider)
@@ -203,7 +224,7 @@ struct ProviderTab: View {
             if let shares = status.usage?.breakdown.filter({ $0.percent > 0 }), !shares.isEmpty {
                 Section(title: "Where usage goes this week") { ShareBar(provider: provider, shares: shares) }
             }
-            TokenSection(store: store, provider: provider)
+            TokenSection(store: store, provider: provider, zoom: zoom)
         }
     }
 }
