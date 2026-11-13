@@ -21,9 +21,10 @@ jobs:
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           swift build -c release --arch arm64
+          BIN_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
           APP="build/$APP_NAME.app"
           mkdir -p "$APP/Contents/MacOS"
-          cp ".build/arm64-apple-macosx/release/$BIN" "$APP/Contents/MacOS/$BIN"
+          cp "$BIN_DIR/$BIN" "$APP/Contents/MacOS/$BIN"
           cp Support/Info.plist "$APP/Contents/Info.plist"
           plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
           plutil -replace CFBundleVersion -string "$GITHUB_RUN_NUMBER" "$APP/Contents/Info.plist"
