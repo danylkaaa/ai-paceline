@@ -18,7 +18,7 @@ final class StatusController: NSObject {
 
     init(store: UsageStore) {
         label = PassThroughHostingView(rootView: MenuBarLabel(store: store))
-        panel = HoverPanel(rootView: PanelView(store: store))
+        panel = HoverPanel(store: store)
         super.init()
 
         guard let button = item.button else { return }
@@ -45,7 +45,7 @@ final class StatusController: NSObject {
 
     private func relayout() {
         item.length = max(24, label.fittingSize.width)
-        if panel.isVisible { panel.resize(anchor: statusFrame) }
+        if panel.isVisible { DispatchQueue.main.async { self.panel.refit() } }
     }
 
     private var statusFrame: NSRect { item.button?.window?.frame ?? .zero }
