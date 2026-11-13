@@ -16,6 +16,8 @@ final class StatusController: NSObject {
     private var lastInside = Date()
     private var clickMonitor: Any?
     private var closedAt = Date.distantPast
+    /// Set by `--open`: the panel stays open whatever the pointer or focus does.
+    private var sticky = false
     private var subscriptions: [AnyCancellable] = []
 
     private let store: UsageStore
@@ -113,7 +115,26 @@ final class StatusController: NSObject {
         }
     }
 
+    /// `--open <tab|settings>`: opens the panel and keeps it open, then prints the window numbers for
+    /// `screencapture -l` and whether the menu bar item is visible (a full menu bar hides it behind the notch).
+    func openForScreenshot(_ target: String) {
+        sticky = true
+        if let tab = Tab.allCases.first(where: { $0.rawValue.lowercased() == target }) {
+            AppDefaults.store.set(tab.rawValue, forKey: "tab")
+        }
+        panel.showSettings(target == "settings")
+        show(pinned: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [self] in
+            let itemWindow = item.button?.window
+            let visible = itemWindow?.occlusionState.contains(.visible) == true
+            print("panel-window \(panel.windowNumber)")
+            print("item-window \(itemWindow?.windowNumber ?? 0) visible=\(visible)")
+            fflush(stdout)
+        }
+    }
+
     private func close() {
+        guard !sticky else { return }
         if panel.isVisible { closedAt = Date() }
         pinned = false
         closeTimer?.invalidate()

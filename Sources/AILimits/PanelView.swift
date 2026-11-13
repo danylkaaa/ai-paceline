@@ -10,7 +10,7 @@ enum Tab: String, CaseIterable, Identifiable {
 struct PanelView: View {
     @ObservedObject var store: UsageStore
     var onResize: () -> Void = {}
-    @AppStorage("tab") private var tab: Tab = .overview
+    @AppStorage("tab", store: AppDefaults.store) private var tab: Tab = .overview
     @ObservedObject var ui: PanelState
 
     var body: some View {
@@ -368,7 +368,7 @@ struct Notice: View {
 struct Footer: View {
     @ObservedObject var store: UsageStore
     @Binding var showSettings: Bool
-    @AppStorage(Settings.refreshMinutes) private var refreshMinutes = 15
+    @AppStorage(Settings.refreshMinutes, store: AppDefaults.store) private var refreshMinutes = 15
 
     var body: some View {
         HStack {

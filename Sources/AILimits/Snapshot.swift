@@ -18,7 +18,7 @@ enum Snapshot {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             for scheme in [ColorScheme.dark, .light] {
                 for (name, tab, settings) in Tab.allCases.map({ ($0.rawValue.lowercased(), $0, false) }) + [("settings", Tab.overview, true)] {
-                    UserDefaults.standard.set(tab.rawValue, forKey: "tab")
+                    AppDefaults.store.set(tab.rawValue, forKey: "tab")
                     ui.showSettings = settings
                     let view = PanelView(store: store, ui: ui)
                         .background(scheme == .dark ? Color(white: 0.16) : Color(white: 0.96))
@@ -31,6 +31,7 @@ enum Snapshot {
                     }
                 }
             }
+            AppDefaults.clearDemo()
             exit(0)
         }
         RunLoop.main.run()

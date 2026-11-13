@@ -17,9 +17,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var status: StatusController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        switch Launch.appearance {
+        case "light": app.appearance = NSAppearance(named: .aqua)
+        case "dark": app.appearance = NSAppearance(named: .darkAqua)
+        default: break
+        }
         let store = UsageStore()
         self.store = store
-        status = StatusController(store: store)
+        let status = StatusController(store: store)
+        self.status = status
         store.start()
+        if let target = Launch.open {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { status.openForScreenshot(target) }
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        AppDefaults.clearDemo()
     }
 }

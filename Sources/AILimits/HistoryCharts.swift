@@ -9,86 +9,114 @@ private let solid = StrokeStyle(lineWidth: 2.2, lineCap: .round)
 private let dashed = StrokeStyle(lineWidth: 1.6, lineCap: .round, dash: [4, 4])
 
 /// This week's used % against even use, with earlier weeks in grey.
+/// Split into small builders: one large chart body takes older compilers too long to type-check.
 struct WeekChart: View {
     var provider: Provider
     var windows: [UsageWindow]
     var current: Limit
     var now: Date
 
-    var body: some View {
+    private var color: Color { Color(Palette.base(provider)) }
+    private var start: Date { (current.resetsAt ?? now).addingTimeInterval(-current.windowSeconds) }
+
+    private var past: [UsageWindow] {
+        Array(windows.filter { $0.resetsAt < start.addingTimeInterval(3600) }.suffix(3))
+    }
+
+    private var currentLine: [ChartPoint] {
         let reset = current.resetsAt ?? now
-        let start = reset.addingTimeInterval(-current.windowSeconds)
-        let past = windows.filter { $0.resetsAt < start.addingTimeInterval(3600) }.suffix(3)
         let saved = windows.last { abs($0.resetsAt.timeIntervalSince(reset)) < 3600 }?.points ?? []
-        let currentLine = [ChartPoint(at: start, value: 0)]
-            + saved.map { ChartPoint(at: $0.at, value: $0.usedPercent) }
-            + [ChartPoint(at: now, value: current.usedPercent)]
-        let color = Color(Palette.base(provider))
+        let points: [ChartPoint] = saved.map { ChartPoint(at: $0.at, value: $0.usedPercent) }
+        return [ChartPoint(at: start, value: 0)] + points + [ChartPoint(at: now, value: current.usedPercent)]
+    }
 
+    var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            chart
+            legend
+        }
+    }
+
+    private var chart: some View {
         Chart {
-            ForEach([0.0, 7.0], id: \.self) { day in
-                LineMark(x: .value("Day", day), y: .value("Used", day / 7 * 100), series: .value("Line", "even"))
-                    .foregroundStyle(Color.secondary.opacity(0.6))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
-            }
-
-            ForEach(Array(past)) { w in
-                let line = [ChartPoint(at: w.start, value: 0)] + w.points.map { ChartPoint(at: $0.at, value: $0.usedPercent) }
-                ForEach(Segments.split(line, maxGap: maxGap)) { seg in
-                    ForEach(seg.points, id: \.at) { p in
-                        LineMark(x: .value("Day", days(p.at, from: w.start)), y: .value("Used", p.value),
-                                 series: .value("Line", "past-\(w.resetsAt.timeIntervalSince1970)-\(seg.id)"))
-                            .foregroundStyle(Color.secondary.opacity(0.35))
-                            .lineStyle(seg.dashed ? StrokeStyle(lineWidth: 1, dash: [3, 3]) : StrokeStyle(lineWidth: 1.2))
-                    }
-                }
-            }
-
-            ForEach(currentLine, id: \.at) { p in
-                AreaMark(x: .value("Day", days(p.at, from: start)), y: .value("Used", p.value), series: .value("Line", "area"))
-                    .foregroundStyle(color.opacity(0.15))
-            }
-            ForEach(Segments.split(currentLine, maxGap: maxGap)) { seg in
-                ForEach(seg.points, id: \.at) { p in
-                    LineMark(x: .value("Day", days(p.at, from: start)), y: .value("Used", p.value),
-                             series: .value("Line", "now-\(seg.id)"))
-                        .foregroundStyle(color)
-                        .lineStyle(seg.dashed ? dashed : solid)
-                }
-            }
-            PointMark(x: .value("Day", days(now, from: start)), y: .value("Used", current.usedPercent))
-                .foregroundStyle(color)
-                .annotation(position: .top, alignment: .center, spacing: 4) {
-                    Text("\(Int(current.usedPercent.rounded()))% used").font(.caption2.weight(.semibold))
-                }
+            evenUse
+            ForEach(past) { w in pastWeek(w) }
+            thisWeek
         }
         .chartXScale(domain: 0...7)
         .chartYScale(domain: 0...100)
-        .chartXAxis {
-            AxisMarks(values: Array(0...6).map(Double.init)) { value in
-                AxisGridLine().foregroundStyle(.quaternary)
-                AxisValueLabel(anchor: .topLeading) {
-                    if let d = value.as(Double.self) {
-                        Text(start.addingTimeInterval(d * 86400).formatted(.dateTime.weekday(.abbreviated)))
-                    }
+        .chartXAxis { weekdayAxis }
+        .chartYAxis { percentAxis }
+        .frame(height: 140)
+    }
+
+    @ChartContentBuilder private var evenUse: some ChartContent {
+        ForEach([0.0, 7.0], id: \.self) { day in
+            LineMark(x: .value("Day", day), y: .value("Used", day / 7 * 100), series: .value("Line", "even"))
+                .foregroundStyle(Color.secondary.opacity(0.6))
+                .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
+        }
+    }
+
+    @ChartContentBuilder private func pastWeek(_ w: UsageWindow) -> some ChartContent {
+        let points: [ChartPoint] = w.points.map { ChartPoint(at: $0.at, value: $0.usedPercent) }
+        let line = [ChartPoint(at: w.start, value: 0)] + points
+        ForEach(Segments.split(line, maxGap: maxGap)) { seg in
+            ForEach(seg.points, id: \.at) { p in
+                LineMark(x: .value("Day", days(p.at, from: w.start)), y: .value("Used", p.value),
+                         series: .value("Line", "past-\(w.resetsAt.timeIntervalSince1970)-\(seg.id)"))
+                    .foregroundStyle(Color.secondary.opacity(0.35))
+                    .lineStyle(seg.dashed ? StrokeStyle(lineWidth: 1, dash: [3, 3]) : StrokeStyle(lineWidth: 1.2))
+            }
+        }
+    }
+
+    @ChartContentBuilder private var thisWeek: some ChartContent {
+        let line = currentLine
+        ForEach(line, id: \.at) { p in
+            AreaMark(x: .value("Day", days(p.at, from: start)), y: .value("Used", p.value), series: .value("Line", "area"))
+                .foregroundStyle(color.opacity(0.15))
+        }
+        ForEach(Segments.split(line, maxGap: maxGap)) { seg in
+            ForEach(seg.points, id: \.at) { p in
+                LineMark(x: .value("Day", days(p.at, from: start)), y: .value("Used", p.value),
+                         series: .value("Line", "now-\(seg.id)"))
+                    .foregroundStyle(color)
+                    .lineStyle(seg.dashed ? dashed : solid)
+            }
+        }
+        PointMark(x: .value("Day", days(now, from: start)), y: .value("Used", current.usedPercent))
+            .foregroundStyle(color)
+            .annotation(position: .top, alignment: .center, spacing: 4) {
+                Text("\(Int(current.usedPercent.rounded()))% used").font(.caption2.weight(.semibold))
+            }
+    }
+
+    private var weekdayAxis: some AxisContent {
+        AxisMarks(values: Array(0...6).map(Double.init)) { value in
+            AxisGridLine().foregroundStyle(.quaternary)
+            AxisValueLabel(anchor: .topLeading) {
+                if let d = value.as(Double.self) {
+                    Text(start.addingTimeInterval(d * 86400).formatted(.dateTime.weekday(.abbreviated)))
                 }
             }
         }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: [0, 50, 100]) { value in
-                AxisGridLine().foregroundStyle(.quaternary)
-                AxisValueLabel { if let v = value.as(Int.self) { Text("\(v)%") } }
-            }
+    }
+
+    private var percentAxis: some AxisContent {
+        AxisMarks(position: .leading, values: [0, 50, 100]) { value in
+            AxisGridLine().foregroundStyle(.quaternary)
+            AxisValueLabel { if let v = value.as(Int.self) { Text("\(v)%") } }
         }
-        .frame(height: 140)
+    }
+
+    private var legend: some View {
         HStack(spacing: 14) {
             LegendItem(label: "This week", color: color, style: StrokeStyle(lineWidth: 2.2))
             if !past.isEmpty {
                 LegendItem(label: "Earlier weeks", color: .secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1.2))
             }
             LegendItem(label: "Even use", color: .secondary, style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
-        }
         }
     }
 

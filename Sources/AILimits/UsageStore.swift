@@ -21,12 +21,22 @@ final class UsageStore: ObservableObject {
     private let historyFile = HistoryFile()
 
     init() {
+        if Launch.demo {
+            let now = Date()
+            history = DemoData.history(now: now)
+            claude = ProviderStatus(usage: DemoData.claude(now: now))
+            codex = ProviderStatus(usage: DemoData.codex(now: now))
+            tokens = [.claude: DemoData.tokens(.claude, now: now), .codex: DemoData.tokens(.codex, now: now)]
+            lastRefresh = now
+            return
+        }
         history = historyFile.load()
         claude = ProviderStatus(usage: history.last[.claude])
         codex = ProviderStatus(usage: history.last[.codex])
     }
 
     func start() {
+        guard !Launch.demo else { return }
         Task { await backfillCodexHistory() }
         ticker = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
@@ -40,13 +50,14 @@ final class UsageStore: ObservableObject {
 
     private func tick() {
         now = Date()
-        let minutes = Double(UserDefaults.standard.integer(forKey: Settings.refreshMinutes))
+        let minutes = Double(AppDefaults.store.integer(forKey: Settings.refreshMinutes))
         if let last = lastRefresh, now.timeIntervalSince(last) >= max(1, minutes) * 60 - 5, !refreshing {
             Task { await refresh() }
         }
     }
 
     func refresh() async {
+        if Launch.demo { now = Date(); lastRefresh = now; return }
         guard !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
@@ -72,6 +83,7 @@ final class UsageStore: ObservableObject {
 
     /// Codex logs every turn's limits, so its weekly history can be filled from them at start.
     func backfillCodexHistory() async {
+        guard !Launch.demo else { return }
         let since = Date().addingTimeInterval(-History.keepDays * 86400)
         let points = await Task.detached { CodexHistory.points(from: CodexLogs(), since: since) }.value
         for point in points { history.add(point) }

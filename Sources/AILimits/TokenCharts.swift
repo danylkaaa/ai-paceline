@@ -11,7 +11,7 @@ struct TokenSection: View {
     @ObservedObject var store: UsageStore
     var provider: Provider
     @ObservedObject var zoom: ChartZoom
-    @AppStorage("metric") private var metric: Metric = .tokens
+    @AppStorage("metric", store: AppDefaults.store) private var metric: Metric = .tokens
 
     var body: some View {
         if let usage = store.tokens[provider] {

@@ -6,6 +6,13 @@ public struct DailyModelUsage: Sendable, Hashable, Identifiable {
     public var tokens: Double
     public var cost: Double
     public var id: String { "\(day.timeIntervalSince1970)-\(model)" }
+
+    public init(day: Date, model: String, tokens: Double, cost: Double) {
+        self.day = day
+        self.model = model
+        self.tokens = tokens
+        self.cost = cost
+    }
 }
 
 public struct ProjectUsage: Sendable, Hashable, Identifiable {
@@ -14,6 +21,13 @@ public struct ProjectUsage: Sendable, Hashable, Identifiable {
     public var tokens: Double
     public var cost: Double
     public var id: String { path }
+
+    public init(name: String, path: String, tokens: Double, cost: Double) {
+        self.name = name
+        self.path = path
+        self.tokens = tokens
+        self.cost = cost
+    }
 }
 
 public struct TokenUsage: Sendable {

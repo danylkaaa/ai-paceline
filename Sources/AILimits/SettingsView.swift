@@ -10,12 +10,14 @@ enum Settings {
     static func price(_ provider: Provider) -> String { "price-\(provider.rawValue)" }
 
     static func register() {
-        UserDefaults.standard.register(defaults: [
+        AppDefaults.clearDemo()
+        AppDefaults.store.register(defaults: [
             refreshMinutes: 15,
             shows(.claude): true,
             shows(.codex): true,
-            price(.claude): 240.0,
-            price(.codex): 22.0,
+            // Prices are not reported by either server; 0 hides them until set in Settings.
+            price(.claude): Launch.demo ? 100.0 : 0.0,
+            price(.codex): Launch.demo ? 20.0 : 0.0,
         ])
     }
 }
@@ -38,7 +40,7 @@ final class PanelState: ObservableObject {
 
 struct SettingsView: View {
     @ObservedObject var ui: PanelState
-    @AppStorage(Settings.refreshMinutes) private var refreshMinutes = 15
+    @AppStorage(Settings.refreshMinutes, store: AppDefaults.store) private var refreshMinutes = 15
     @AppStorage(Settings.shows(.claude)) private var showClaude = true
     @AppStorage(Settings.shows(.codex)) private var showCodex = true
     @AppStorage(Settings.price(.claude)) private var claudePrice = 240.0
@@ -78,6 +80,7 @@ struct SettingsView: View {
     }
 
     private func setStartAtLogin(_ on: Bool) {
+        guard !Launch.demo else { return }
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             ui.loginNote = SMAppService.mainApp.status == .requiresApproval
