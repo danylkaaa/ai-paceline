@@ -37,6 +37,14 @@ public enum Palette {
         provider == .claude ? RGB(hex: 0xD97757) : RGB(hex: 0x2A9D8F)
     }
 
+    /// Chart series colors: distinct hues inside the provider's family, most used first.
+    public static func series(_ provider: Provider, index: Int) -> RGB {
+        let colors: [UInt32] = provider == .claude
+            ? [0xD97757, 0xE8B04B, 0xB5487A, 0x8C5A3C, 0xF2B48F]
+            : [0x2A9D8F, 0x4A90D9, 0x7FCDBB, 0x5B6CC2, 0x9ED9F0]
+        return RGB(hex: colors[index % colors.count])
+    }
+
     /// Ring color: light below 50% used, base up to 80%, deep above.
     public static func ring(_ provider: Provider, usedPercent: Double) -> RGB {
         let steps: [UInt32] = provider == .claude

@@ -116,6 +116,7 @@ struct ProviderTab: View {
             if let shares = status.usage?.breakdown.filter({ $0.percent > 0 }), !shares.isEmpty {
                 Section(title: "Where usage goes this week") { ShareBar(provider: provider, shares: shares) }
             }
+            TokenSection(store: store, provider: provider)
         }
     }
 }

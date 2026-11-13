@@ -11,6 +11,8 @@ final class UsageStore: ObservableObject {
     @Published var now = Date()
     @Published var refreshing = false
     @Published var lastRefresh: Date?
+    @Published var tokens: [Provider: TokenUsage] = [:]
+    @Published var tokenErrors: [Provider: String] = [:]
 
     private let claudeClient = ClaudeClient()
     private let codexClient = CodexClient()
@@ -45,6 +47,31 @@ final class UsageStore: ObservableObject {
         codex = Self.merge(codex, codexResult)
         now = Date()
         lastRefresh = now
+        await refreshTokens()
+    }
+
+    private func refreshTokens() async {
+        async let c = Self.loadTokens(.claude) { try await CCUsage.claude() }
+        async let x = Self.loadTokens(.codex) { try await CCUsage.codex() }
+        for (provider, result) in await [(Provider.claude, c), (.codex, x)] {
+            switch result {
+            case .success(let usage):
+                tokens[provider] = usage
+                tokenErrors[provider] = nil
+            case .failure(let error):
+                tokenErrors[provider] = "Token history not available: \(error)"
+            }
+        }
+    }
+
+    private static func loadTokens(_ provider: Provider,
+                                   _ load: @Sendable () async throws -> TokenUsage) async -> Result<TokenUsage, Error> {
+        do {
+            return .success(try await load())
+        } catch {
+            log.error("ccusage failed provider=\(provider.rawValue, privacy: .public) error=\(String(describing: error), privacy: .public)")
+            return .failure(error)
+        }
     }
 
     private static func load(_ provider: Provider,
