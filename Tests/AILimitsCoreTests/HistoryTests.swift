@@ -98,12 +98,12 @@ import Testing
 
     // MARK: windows
 
-    @Test func windowsGroupsPointsOfOneProviderByResetRoundedToTheHour() {
+    @Test func windowsUsesTheLatestResetOfAGroupAsResetsAtAndStartAndIgnoresOtherProviders() {
         // arrange
         let reset = t0
         var history = History()
-        history.add(Factories.point(.claude, at: t0 - 100, resetsAt: reset - 2))
-        history.add(Factories.point(.claude, at: t0 - 50, resetsAt: reset + 1))
+        history.add(Factories.point(.claude, at: t0 - 100, resetsAt: reset + 1))
+        history.add(Factories.point(.claude, at: t0 - 50, resetsAt: reset - 2))
         history.add(Factories.point(.codex, at: t0 - 75, resetsAt: reset))
 
         // act
@@ -111,9 +111,41 @@ import Testing
 
         // assert
         #expect(windows.count == 1)
-        #expect(windows[0].resetsAt == reset)
-        #expect(windows[0].start == reset - 7 * day)
-        #expect(windows[0].points.count == 2)
+        #expect(windows[0].resetsAt == reset + 1)
+        #expect(windows[0].start == reset + 1 - 7 * day)
+        #expect(windows[0].points.map(\.at) == [t0 - 100, t0 - 50])
+    }
+
+    @Test(arguments: [
+        (3599.0, [3599.0]),
+        (3600.0, [0.0, 3600.0]),
+        (3601.0, [0.0, 3601.0]),
+    ])
+    func windowsGroupsResetsLessThanAnHourApartAndSplitsThemAtOneHour(offset: Double, expected: [Double]) {
+        // arrange
+        let reset = t0 + day
+        let history = Factories.history(resets: [reset, reset + offset])
+
+        // act
+        let windows = history.windows(.claude)
+
+        // assert
+        #expect(windows.map(\.resetsAt) == expected.map { reset + $0 })
+        #expect(windows.map(\.points.count).reduce(0, +) == 2)
+    }
+
+    @Test func windowsChainsResetsThatDriftLessThanAnHourStepByStepIntoOneWindow() {
+        // arrange
+        let reset = t0 + day
+        let history = Factories.history(resets: [reset, reset + 3000, reset + 6000])
+
+        // act
+        let windows = history.windows(.claude)
+
+        // assert
+        #expect(windows.count == 1)
+        #expect(windows[0].resetsAt == reset + 6000)
+        #expect(windows[0].points.count == 3)
     }
 
     @Test func windowsReturnsSeparateWeeksOldestFirstWithTheirPointsSortedByTime() {
@@ -242,20 +274,5 @@ import Testing
 
         // assert
         #expect(point == nil)
-    }
-
-    @Test func windowsKeepsOneWeekWhenItsResetJittersAcrossTheHalfHour() {
-        // arrange
-        let reset = Fixed.t0.addingTimeInterval(7 * 86400 + 1800)
-        var history = History()
-        history.add(Factories.point(.codex, at: Fixed.t0, resetsAt: reset.addingTimeInterval(-1)))
-        history.add(Factories.point(.codex, at: Fixed.t0.addingTimeInterval(600), resetsAt: reset.addingTimeInterval(1)))
-
-        // act
-        let windows = history.windows(.codex)
-
-        // assert
-        #expect(windows.count == 1)
-        #expect(windows.first?.points.count == 2)
     }
 }

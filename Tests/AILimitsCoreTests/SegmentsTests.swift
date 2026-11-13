@@ -76,7 +76,7 @@ import Testing
         #expect(result.map(\.id) == Array(0..<result.count))
     }
 
-    @Test func splitDoesNotEmitAOnePointSolidRunWhenTheGapIsFirst() {
+    @Test func splitDrawsTheLinkFromALonePointToARunOfTwoSolid() {
         // arrange
         let points = Factories.chartLine(gaps: [overGap, step])
 
@@ -84,13 +84,13 @@ import Testing
         let result = Segments.split(points, maxGap: gap)
 
         // assert
-        #expect(result.map(\.dashed) == [true, false])
+        #expect(result.map(\.dashed) == [false, false])
         #expect(result[0].points == [points[0], points[1]])
         #expect(result[1].points == [points[1], points[2]])
-        #expect(result.allSatisfy { $0.points.count > 1 })
+        #expect(result.allSatisfy { $0.points.count >= 2 })
     }
 
-    @Test func splitDoesNotEmitAOnePointSolidRunWhenTheGapIsLast() {
+    @Test func splitDrawsTheLinkFromARunOfTwoToALonePointSolid() {
         // arrange
         let points = Factories.chartLine(gaps: [step, overGap])
 
@@ -98,10 +98,36 @@ import Testing
         let result = Segments.split(points, maxGap: gap)
 
         // assert
-        #expect(result.map(\.dashed) == [false, true])
+        #expect(result.map(\.dashed) == [false, false])
         #expect(result[0].points == [points[0], points[1]])
         #expect(result[1].points == [points[1], points[2]])
-        #expect(result.allSatisfy { $0.points.count > 1 })
+    }
+
+    @Test func splitDrawsOneSolidLinkBetweenTwoLonePoints() {
+        // arrange
+        let points = Factories.chartLine(gaps: [overGap])
+
+        // act
+        let result = Segments.split(points, maxGap: gap)
+
+        // assert
+        #expect(result.count == 1)
+        #expect(result[0].dashed == false)
+        #expect(result[0].points == [points[0], points[1]])
+    }
+
+    @Test func splitDrawsBothLinksAroundALonePointBetweenTwoRunsSolid() {
+        // arrange
+        let points = Factories.chartLine(gaps: [step, overGap, overGap, step])
+
+        // act
+        let result = Segments.split(points, maxGap: gap)
+
+        // assert
+        #expect(result.map(\.points) == [[points[0], points[1]], [points[1], points[2]],
+                                         [points[2], points[3]], [points[3], points[4]]])
+        #expect(result.map(\.dashed) == [false, false, false, false])
+        #expect(result.map(\.id) == [0, 1, 2, 3])
     }
 
     @Test func leftLineIsEmptyForAWindowWithoutPoints() {

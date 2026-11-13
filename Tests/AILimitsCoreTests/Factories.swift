@@ -65,6 +65,15 @@ enum Factories {
         HistoryPoint(provider: provider, at: at, usedPercent: usedPercent, resetsAt: resetsAt ?? at.addingTimeInterval(86400))
     }
 
+    /// One point per reset, at t0 + i * 60 s.
+    static func history(_ provider: Provider = .claude, resets: [Date]) -> History {
+        var history = History()
+        for (i, reset) in resets.enumerated() {
+            history.add(point(provider, at: Fixed.t0 + Double(i) * 60, resetsAt: reset))
+        }
+        return history
+    }
+
     static func namedLimit(id: String, usedPercent: Double = 10, resetsAt: Date? = nil, windowSeconds: TimeInterval = 18000) -> Limit {
         Limit(id: id, title: id, usedPercent: usedPercent, resetsAt: resetsAt, windowSeconds: windowSeconds)
     }

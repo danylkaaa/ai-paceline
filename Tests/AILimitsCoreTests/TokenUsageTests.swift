@@ -161,6 +161,7 @@ import Testing
         ("claude-sonnet-4-5-20250929", "Sonnet 4.5"),
         ("claude-opus-4", "Opus 4"),
         ("claude-haiku", "Haiku"),
+        ("claude-opus-4-20250514", "Opus 4"),
         ("gpt-5-codex", "gpt-5-codex"),
     ])
     func modelNameShortShortensClaudeIdsAndLeavesOtherNamesUnchanged(name: String, expected: String) {
@@ -205,14 +206,55 @@ import Testing
         #expect(path == "/Users/demo/.claude")
     }
 
-    @Test func modelNameShortensALegacyClaudeIdWithTheVersionBeforeTheFamily() {
-        // arrange
-        let id = "claude-3-5-sonnet-20241022"
-
+    @Test(arguments: [
+        ("claude-3-5-sonnet-20241022", "Sonnet 3.5"),
+        ("claude-3-7-sonnet-20250219", "Sonnet 3.7"),
+        ("claude-3-opus-20240229", "Opus 3"),
+        ("claude-3-5-haiku-latest", "Haiku 3.5"),
+        ("claude-3-5", "claude-3-5"),
+    ])
+    func modelNameShortensLegacyClaudeIds(id: String, expected: String) {
         // act
-        let name = ModelName.short(id)
+        let result = ModelName.short(id)
 
         // assert
-        #expect(name == "Sonnet 3.5")
+        #expect(result == expected)
+    }
+
+    @Test(arguments: [
+        ("-Users-demo--claude", "/Users/demo/.claude"),
+        ("-Users-demo-claude", "/Users/demo/claude"),
+    ])
+    func projectPathResolvePicksTheHiddenFolderForADoubleDashAndTheVisibleOneForASingleDashWhenBothExist(encoded: String, expected: String) {
+        // arrange
+        let existing: Set<String> = ["/Users", "/Users/demo", "/Users/demo/claude", "/Users/demo/.claude"]
+
+        // act
+        let path = ProjectPath.resolve(encoded, exists: { existing.contains($0) })
+
+        // assert
+        #expect(path == expected)
+    }
+
+    @Test func projectPathResolveKeepsTheDotOnAHiddenFolderThatIsGone() {
+        // arrange
+        let existing: Set<String> = ["/Users", "/Users/demo"]
+
+        // act
+        let path = ProjectPath.resolve("-Users-demo--gone", exists: { existing.contains($0) })
+
+        // assert
+        #expect(path == "/Users/demo/.gone")
+    }
+
+    @Test func projectPathResolveAppliesTheHiddenMarkOnlyToTheNextPart() {
+        // arrange
+        let existing: Set<String> = ["/Users", "/Users/demo", "/Users/demo/.config", "/Users/demo/.config/app"]
+
+        // act
+        let path = ProjectPath.resolve("-Users-demo--config-app", exists: { existing.contains($0) })
+
+        // assert
+        #expect(path == "/Users/demo/.config/app")
     }
 }
