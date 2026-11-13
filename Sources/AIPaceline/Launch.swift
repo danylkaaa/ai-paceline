@@ -18,7 +18,7 @@ enum Launch {
 
 /// Settings storage. Demo mode uses its own domain, emptied at start and at quit, so it never touches real settings.
 enum AppDefaults {
-    static let demoSuite = (Bundle.main.bundleIdentifier ?? "local.ailimits") + ".demo"
+    static let demoSuite = (Bundle.main.bundleIdentifier ?? "io.github.danylkaaa.aipaceline") + ".demo"
     /// UserDefaults is thread-safe; Apple documents it as safe to use from any thread.
     nonisolated(unsafe) static let store: UserDefaults = Launch.demo ? UserDefaults(suiteName: demoSuite) ?? .standard : .standard
 

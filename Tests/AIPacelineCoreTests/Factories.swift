@@ -1,5 +1,5 @@
 import Foundation
-@testable import AILimitsCore
+@testable import AIPacelineCore
 
 enum Fixed {
     static let t0 = Date(timeIntervalSince1970: 1_800_000_000)

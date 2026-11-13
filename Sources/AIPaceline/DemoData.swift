@@ -1,4 +1,4 @@
-import AILimitsCore
+import AIPacelineCore
 import Foundation
 
 /// Made-up data for `--demo`: stable across runs, so screenshots do not change, and free of real names.

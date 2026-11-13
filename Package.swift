@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "AILimits",
+    name: "AIPaceline",
     platforms: [.macOS(.v15)],
     targets: [
-        .target(name: "AILimitsCore"),
-        .executableTarget(name: "AILimits", dependencies: ["AILimitsCore"]),
-        .testTarget(name: "AILimitsCoreTests", dependencies: ["AILimitsCore"]),
+        .target(name: "AIPacelineCore"),
+        .executableTarget(name: "AIPaceline", dependencies: ["AIPacelineCore"]),
+        .testTarget(name: "AIPacelineCoreTests", dependencies: ["AIPacelineCore"]),
     ]
 )

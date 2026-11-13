@@ -1,4 +1,4 @@
-import AILimitsCore
+import AIPacelineCore
 import AppKit
 import Combine
 import SwiftUI
@@ -128,7 +128,9 @@ final class StatusController: NSObject {
             let itemWindow = item.button?.window
             let visible = itemWindow?.occlusionState.contains(.visible) == true
             print("panel-window \(panel.windowNumber)")
-            print("item-window \(itemWindow?.windowNumber ?? 0) visible=\(visible)")
+            let frame = itemWindow?.frame ?? .zero
+            let top = NSScreen.screens.first?.frame.maxY ?? 0
+            print("item-rect \(Int(frame.minX)),\(Int(top - frame.maxY)),\(Int(frame.width)),\(Int(frame.height)) visible=\(visible)")
             fflush(stdout)
         }
     }

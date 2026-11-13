@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Paceline</title>
+<meta name="description" content="A macOS menu bar app that shows how much of your Claude and Codex limits you have left, and whether you are on pace to last until the reset.">
+<meta name="color-scheme" content="light dark">
+<style>
+/* Layout: one centered column; hero, then alternating feature rows with screenshots, then install and build. */
+:root {
+  --bg: #f6f4f1; --surface: #ffffff; --fg: #1f1d1b; --muted: #6b655e; --line: #e4dfd8;
+  --claude: #d97757; --codex: #2a9d8f; --accent: #c4623f; --code-bg: #efebe5;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #171615; --surface: #211f1d; --fg: #f1ede8; --muted: #a39b92; --line: #34302c;
+    --accent: #e8916f; --code-bg: #2a2724;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; overflow-x: hidden; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--font); }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+a { color: var(--accent); }
+img { max-width: 100%; height: auto; display: block; }
+code { font: 0.9em var(--mono); background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 5px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 14px 16px; border-radius: 10px; overflow-x: auto; margin: 0; }
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+
+header.hero { padding: 72px 0 40px; display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: center; }
+.bars { display: inline-flex; flex-direction: column; gap: 5px; padding: 10px 14px; border-radius: 10px;
+        background: var(--surface); border: 1px solid var(--line); margin-bottom: 22px; }
+.bar { width: 64px; height: 9px; border-radius: 9px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 9px; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.05; margin: 0 0 16px; letter-spacing: -0.02em; text-wrap: balance; }
+.lede { font-size: 1.15rem; color: var(--muted); margin: 0 0 28px; max-width: 34em; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px; font-weight: 600;
+       text-decoration: none; border: 1px solid transparent; }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.ghost { border-color: var(--line); color: var(--fg); background: var(--surface); }
+.btn:focus-visible { outline: 3px solid var(--codex); outline-offset: 2px; }
+.small { color: var(--muted); font-size: 0.88rem; margin-top: 12px; }
+.hero-shot { justify-self: center; max-width: 420px; }
+
+section { padding: 48px 0; border-top: 1px solid var(--line); }
+h2 { font-size: 1.6rem; margin: 0 0 18px; letter-spacing: -0.01em; }
+.feature { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: center; padding: 28px 0; }
+.feature:nth-child(even) .shot { order: -1; }
+.feature h3 { font-size: 1.2rem; margin: 0 0 8px; }
+.feature p { margin: 0; color: var(--muted); }
+.shot { max-width: 400px; justify-self: center; }
+.grid4 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 28px; }
+.grid4 div { min-width: 0; }
+.grid4 b { display: block; }
+.grid4 span { color: var(--muted); }
+ol { padding-left: 1.3em; margin: 0; display: grid; gap: 14px; }
+ol li { min-width: 0; }
+footer { padding: 36px 0 56px; color: var(--muted); font-size: 0.9rem; border-top: 1px solid var(--line); }
+
+@media (max-width: 760px) {
+  header.hero { grid-template-columns: 1fr; padding-top: 44px; }
+  .feature { grid-template-columns: 1fr; gap: 20px; }
+  .feature:nth-child(even) .shot { order: 0; }
+  .grid4 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div>
+      <div class="bars" aria-hidden="true">
+        <div class="bar"><i style="width:46%;background:var(--claude)"></i></div>
+        <div class="bar"><i style="width:28%;background:var(--codex)"></i></div>
+      </div>
+      <h1>AI Paceline</h1>
+      <p class="lede">Your Claude and Codex limits in the macOS menu bar: how much is left this week, when it resets, and
+        whether you are on pace to last until then.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/danylkaaa/ai-paceline/releases/latest/download/AIPaceline-macos-arm64.zip">Download for Apple silicon</a>
+        <a class="btn ghost" href="https://github.com/danylkaaa/ai-paceline">Source on GitHub</a>
+      </div>
+      <p class="small">Free and open source (MIT). macOS 15 or later.</p>
+    </div>
+    <picture class="hero-shot">
+      <source srcset="screenshots/overview-dark.png" media="(prefers-color-scheme: dark)">
+      <img src="screenshots/overview-light.png" width="486" height="477" alt="The AI Paceline panel: Claude and Codex cards with % left this week, and the weekly limit over the last 7 days">
+    </picture>
+  </header>
+
+  <section aria-labelledby="features">
+    <h2 id="features">What it shows</h2>
+    <div class="feature">
+      <div>
+        <h3>Two bars, one glance</h3>
+        <p>Claude on top, Codex below. Each bar fills with the weekly limit you have used, gets deeper in color as you
+          near the limit, and turns grey when the numbers are stale. Hover for the exact numbers.</p>
+      </div>
+      <picture class="shot">
+        <source srcset="screenshots/menubar-dark.png" media="(prefers-color-scheme: dark)">
+        <img src="screenshots/menubar-light.png" width="54" height="24" alt="The menu bar item: an orange bar for Claude above a teal bar for Codex" style="width:160px">
+      </picture>
+    </div>
+    <div class="feature">
+      <div>
+        <h3>Pace, not just percent</h3>
+        <p>Every limit has a marker for even use until the reset. You see "20% in reserve" or "runs out Sat 18:00",
+          and this week's line next to earlier weeks.</p>
+      </div>
+      <picture class="shot">
+        <source srcset="screenshots/claude-dark.png" media="(prefers-color-scheme: dark)">
+        <img src="screenshots/claude-light.png" width="486" height="959" alt="The Claude tab: session and weekly limits with pace markers, this week's chart and token usage by model" loading="lazy">
+      </picture>
+    </div>
+    <div class="feature">
+      <div>
+        <h3>Tokens and cost per day</h3>
+        <p>Daily tokens and estimated API cost by model, read from your local Claude Code and Codex logs. Pinch or
+          scroll to zoom the time window, swipe to move back in time.</p>
+      </div>
+      <picture class="shot">
+        <source srcset="screenshots/codex-dark.png" media="(prefers-color-scheme: dark)">
+        <img src="screenshots/codex-light.png" width="486" height="783" alt="The Codex tab: session and weekly limits, this week's chart and daily tokens by model" loading="lazy">
+      </picture>
+    </div>
+    <div class="feature">
+      <div>
+        <h3>Your settings</h3>
+        <p>Refresh every 5 to 60 minutes, choose which bars to show, enter what you pay per month, and start at login.</p>
+      </div>
+      <picture class="shot">
+        <source srcset="screenshots/settings-dark.png" media="(prefers-color-scheme: dark)">
+        <img src="screenshots/settings-light.png" width="486" height="395" alt="The settings: refresh interval, bars to show, monthly prices and start at login" loading="lazy">
+      </picture>
+    </div>
+  </section>
+
+  <section aria-labelledby="install">
+    <h2 id="install">Install</h2>
+    <ol>
+      <li>Download <a href="https://github.com/danylkaaa/ai-paceline/releases/latest/download/AIPaceline-macos-arm64.zip"><code>AIPaceline-macos-arm64.zip</code></a>,
+        unzip it, and move <code>AI Paceline.app</code> to <code>~/Applications</code>.</li>
+      <li>The app is ad-hoc signed and not notarized. Remove the quarantine flag once:
+        <pre><code>xattr -dr com.apple.quarantine ~/Applications/"AI Paceline.app"</code></pre></li>
+      <li>Open it. It uses the Claude Code and Codex logins already on your Mac. The token charts need Node.js
+        (they run <code>npx ccusage</code>).</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="build">
+    <h2 id="build">Build from source</h2>
+    <p>Needs the Xcode Command Line Tools and <a href="https://taskfile.dev">Task</a>.</p>
+    <pre><code>git clone https://github.com/danylkaaa/ai-paceline.git
+cd ai-paceline
+task install   # build, copy to ~/Applications, start
+task test      # unit tests</code></pre>
+  </section>
+
+  <section aria-labelledby="data">
+    <h2 id="data">Where the numbers come from</h2>
+    <div class="grid4">
+      <div><b>Claude limits and plan</b><span>The usage endpoint Claude Code itself uses, with its login on your Mac.</span></div>
+      <div><b>Codex limits and plan</b><span>The ChatGPT usage endpoint, with the Codex login on your Mac.</span></div>
+      <div><b>Tokens and cost</b><span>Your local logs, read with ccusage. Cost is an estimate at API prices, not your bill.</span></div>
+      <div><b>Privacy</b><span>No account, no telemetry. Requests go only to those usage servers, and to npm for ccusage.</span></div>
+    </div>
+  </section>
+
+  <footer>AI Paceline is not affiliated with Anthropic or OpenAI. MIT license ·
+    <a href="https://github.com/danylkaaa/ai-paceline">github.com/danylkaaa/ai-paceline</a></footer>
+</div>
+</body>
+</html>

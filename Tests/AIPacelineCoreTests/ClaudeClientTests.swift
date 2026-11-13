@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AILimitsCore
+@testable import AIPacelineCore
 
 @Suite struct ClaudeClientTests {
     let t0 = Fixed.t0

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AILimitsCore
+@testable import AIPacelineCore
 
 @Suite struct TokenUsageTests {
     static let opus = "claude-opus-4-1"

@@ -74,7 +74,7 @@ public struct HistoryFile: Sendable {
 
     public static var defaultURL: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("AILimits/history.json")
+            .appendingPathComponent("AI Paceline/history.json")
     }
 
     /// Loads the saved history. A file that does not decode is moved to `history.json.bak`, so a format change

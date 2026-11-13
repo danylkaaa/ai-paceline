@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import AILimitsCore
+@testable import AIPacelineCore
 
 @Suite struct PaceTests {
     let t0 = Fixed.t0

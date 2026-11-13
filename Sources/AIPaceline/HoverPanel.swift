@@ -21,7 +21,8 @@ final class HoverPanel: NSPanel {
 
         let background = NSVisualEffectView()
         background.material = .popover
-        background.blendingMode = .behindWindow
+        // Window screenshots (`--open`) have no desktop behind the panel; blend inside the window there.
+        background.blendingMode = Launch.open == nil ? .behindWindow : .withinWindow
         background.state = .active
         background.wantsLayer = true
         background.layer?.cornerRadius = 14

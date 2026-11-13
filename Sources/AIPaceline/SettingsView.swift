@@ -1,4 +1,4 @@
-import AILimitsCore
+import AIPacelineCore
 import ServiceManagement
 import SwiftUI
 
@@ -73,7 +73,7 @@ struct SettingsView: View {
                 if let note = ui.loginNote { Text(note).font(.caption).foregroundStyle(.orange) }
             }
 
-            Button("Quit AI Limits") { NSApp.terminate(nil) }
+            Button("Quit AI Paceline") { NSApp.terminate(nil) }
         }
         .toggleStyle(.checkbox)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,7 +84,7 @@ struct SettingsView: View {
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
             ui.loginNote = SMAppService.mainApp.status == .requiresApproval
-                ? "Allow AI Limits in System Settings → General → Login Items." : nil
+                ? "Allow AI Paceline in System Settings → General → Login Items." : nil
         } catch {
             ui.loginNote = "Could not change: \(error.localizedDescription)"
             log.error("login item change failed error=\(String(describing: error), privacy: .public)")

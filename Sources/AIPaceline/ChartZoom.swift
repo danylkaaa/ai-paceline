@@ -63,7 +63,8 @@ final class ChartZoom: ObservableObject {
 extension View {
     /// Scroll wheel and pinch over this view change the zoom instead of scrolling the panel.
     @ViewBuilder func zoomable(_ zoom: ChartZoom) -> some View {
-        if Snapshot.active { self } else { overlay(ZoomCatcher(zoom: zoom)) }
+        // Snapshots and --open screenshots keep the default window, whatever the pointer does.
+        if Snapshot.active || Launch.open != nil { self } else { overlay(ZoomCatcher(zoom: zoom)) }
     }
 }
 

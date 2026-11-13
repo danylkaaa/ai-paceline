@@ -1,4 +1,4 @@
-import AILimitsCore
+import AIPacelineCore
 import SwiftUI
 
 enum Tab: String, CaseIterable, Identifiable {

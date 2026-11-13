@@ -1,8 +1,8 @@
-import AILimitsCore
+import AIPacelineCore
 import Foundation
 import os
 
-let log = Logger(subsystem: "local.ailimits", category: "usage")
+let log = Logger(subsystem: "io.github.danylkaaa.aipaceline", category: "usage")
 
 @MainActor
 final class UsageStore: ObservableObject {

@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// `AILimits --snapshot <dir>`: fetches real data, writes one PNG per tab, and exits. Used to check the UI.
+/// `AIPaceline --snapshot <dir>`: fetches real data, writes one PNG per tab, and exits. Used to check the UI.
 @MainActor
 enum Snapshot {
     /// ImageRenderer cannot draw AppKit views, so snapshot mode leaves them out.
@@ -29,6 +29,20 @@ enum Snapshot {
                        let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
                         try? png.write(to: dir.appendingPathComponent("\(name)-\(scheme).png"))
                     }
+                }
+            }
+            // The menu bar item, rendered from the same view the status item hosts.
+            for scheme in [ColorScheme.light, .dark] {
+                let bar = MenuBarLabel(store: store)
+                    .environment(\.colorScheme, scheme)
+                    .padding(.horizontal, 10)
+                    .frame(height: 24)
+                    .background(scheme == .dark ? Color(white: 0.12) : Color(white: 0.93))
+                let renderer = ImageRenderer(content: bar)
+                renderer.scale = 3
+                if let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+                   let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+                    try? png.write(to: dir.appendingPathComponent("menubar-\(scheme).png"))
                 }
             }
             AppDefaults.clearDemo()
