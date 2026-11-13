@@ -1,0 +1,36 @@
+version: "3"
+
+vars:
+  APP: build/AI Limits.app
+  INSTALLED: "{{.HOME}}/Applications/AI Limits.app"
+
+tasks:
+  build:
+    desc: Build the app bundle into build/
+    cmds:
+      - swift build -c release --quiet
+      - rm -rf "{{.APP}}" && mkdir -p "{{.APP}}/Contents/MacOS"
+      - cp .build/release/AILimits "{{.APP}}/Contents/MacOS/AILimits"
+      - cp Support/Info.plist "{{.APP}}/Contents/Info.plist"
+      - codesign --force --sign - "{{.APP}}" 2>/dev/null
+
+  run:
+    desc: Build and start the app from build/
+    deps: [build]
+    cmds:
+      - pkill -x AILimits || true
+      - open "{{.APP}}"
+
+  install:
+    desc: Build and install into ~/Applications, then start it
+    deps: [build]
+    cmds:
+      - pkill -x AILimits || true
+      - rm -rf "{{.INSTALLED}}"
+      - cp -R "{{.APP}}" "{{.INSTALLED}}"
+      - open "{{.INSTALLED}}"
+
+  test:
+    desc: Run unit tests
+    cmds:
+      - swift test --quiet
