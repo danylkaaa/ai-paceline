@@ -41,9 +41,14 @@ struct OverviewTab: View {
     @ObservedObject var store: UsageStore
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ForEach(Provider.allCases) { provider in
-                SummaryCard(provider: provider, status: store.status(provider), now: store.now)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                ForEach(Provider.allCases) { provider in
+                    SummaryCard(provider: provider, status: store.status(provider), now: store.now)
+                }
+            }
+            Section(title: "Weekly limit used, last 7 days") {
+                OverviewChart(history: store.history, now: store.now)
             }
         }
     }
@@ -112,6 +117,11 @@ struct ProviderTab: View {
             }
             ForEach(status.usage?.limits ?? []) { limit in
                 LimitRow(provider: provider, limit: limit, now: store.now, stale: status.error != nil)
+            }
+            if let weekly = status.usage?.weekly, weekly.resetsAt != nil {
+                Section(title: "This week") {
+                    WeekChart(provider: provider, windows: store.history.windows(provider), current: weekly, now: store.now)
+                }
             }
             if let shares = status.usage?.breakdown.filter({ $0.percent > 0 }), !shares.isEmpty {
                 Section(title: "Where usage goes this week") { ShareBar(provider: provider, shares: shares) }

@@ -13,12 +13,21 @@ final class UsageStore: ObservableObject {
     @Published var lastRefresh: Date?
     @Published var tokens: [Provider: TokenUsage] = [:]
     @Published var tokenErrors: [Provider: String] = [:]
+    @Published var history: History
 
     private let claudeClient = ClaudeClient()
     private let codexClient = CodexClient()
     private var ticker: Timer?
+    private let historyFile = HistoryFile()
+
+    init() {
+        history = historyFile.load()
+        claude = ProviderStatus(usage: history.last[.claude])
+        codex = ProviderStatus(usage: history.last[.codex])
+    }
 
     func start() {
+        Task { await backfillCodexHistory() }
         ticker = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
@@ -45,9 +54,27 @@ final class UsageStore: ObservableObject {
         let (claudeResult, codexResult) = await (c, x)
         claude = Self.merge(claude, claudeResult)
         codex = Self.merge(codex, codexResult)
+        for case .success(let usage) in [claudeResult, codexResult] { history.record(usage) }
+        saveHistory()
         now = Date()
         lastRefresh = now
         await refreshTokens()
+    }
+
+    private func saveHistory() {
+        do {
+            try historyFile.save(history)
+        } catch {
+            log.error("history save failed error=\(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Codex logs every turn's limits, so its weekly history can be filled from them at start.
+    private func backfillCodexHistory() async {
+        let since = Date().addingTimeInterval(-History.keepDays * 86400)
+        let points = await Task.detached { CodexHistory.points(from: CodexLogs(), since: since) }.value
+        for point in points { history.add(point) }
+        saveHistory()
     }
 
     private func refreshTokens() async {

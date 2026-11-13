@@ -34,3 +34,9 @@ tasks:
     desc: Run unit tests
     cmds:
       - swift test --quiet
+
+  snapshot:
+    desc: Render each panel tab with real data into build/snapshots
+    deps: [build]
+    cmds:
+      - '"{{.APP}}/Contents/MacOS/AILimits" --snapshot build/snapshots'
