@@ -14,7 +14,7 @@ final class StatusController: NSObject {
     private var closeTimer: Timer?
     private var lastInside = Date()
     private var clickMonitor: Any?
-    private var subscription: AnyCancellable?
+    private var subscriptions: [AnyCancellable] = []
 
     init(store: UsageStore) {
         label = PassThroughHostingView(rootView: MenuBarLabel(store: store))
@@ -37,9 +37,14 @@ final class StatusController: NSObject {
         tracker.onEnter = { [weak self] in self?.pointerEntered() }
         tracker.onExit = { [weak self] in self?.openWork?.cancel() }
 
-        subscription = store.objectWillChange
+        store.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] in self?.relayout() }
+            .store(in: &subscriptions)
+        NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.relayout() }
+            .store(in: &subscriptions)
         relayout()
     }
 

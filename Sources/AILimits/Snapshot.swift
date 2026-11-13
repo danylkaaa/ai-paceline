@@ -6,20 +6,22 @@ import SwiftUI
 enum Snapshot {
     static func run(into dir: URL) {
         let store = UsageStore()
+        let ui = PanelState()
         Task {
             await store.refresh()
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             for scheme in [ColorScheme.dark, .light] {
-                for tab in Tab.allCases {
+                for (name, tab, settings) in Tab.allCases.map({ ($0.rawValue.lowercased(), $0, false) }) + [("settings", Tab.overview, true)] {
                     UserDefaults.standard.set(tab.rawValue, forKey: "tab")
-                    let view = PanelView(store: store)
+                    ui.showSettings = settings
+                    let view = PanelView(store: store, ui: ui)
                         .background(scheme == .dark ? Color(white: 0.16) : Color(white: 0.96))
                         .environment(\.colorScheme, scheme)
                     let renderer = ImageRenderer(content: view)
                     renderer.scale = 2
                     if let image = renderer.nsImage, let tiff = image.tiffRepresentation,
                        let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
-                        try? png.write(to: dir.appendingPathComponent("\(tab.rawValue.lowercased())-\(scheme).png"))
+                        try? png.write(to: dir.appendingPathComponent("\(name)-\(scheme).png"))
                     }
                 }
             }

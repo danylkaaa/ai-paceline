@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 final class HoverPanel: NSPanel {
     private var host: NSHostingView<PanelView>!
+    private let ui = PanelState()
 
     init(store: UsageStore) {
         super.init(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
@@ -24,7 +25,7 @@ final class HoverPanel: NSPanel {
         background.wantsLayer = true
         background.layer?.cornerRadius = 14
         background.layer?.masksToBounds = true
-        host = NSHostingView(rootView: PanelView(store: store, onResize: { [weak self] in self?.refit() }))
+        host = NSHostingView(rootView: PanelView(store: store, onResize: { [weak self] in self?.refit() }, ui: ui))
         host.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(host)
         NSLayoutConstraint.activate([

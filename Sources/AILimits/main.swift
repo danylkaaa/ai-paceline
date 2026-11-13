@@ -1,6 +1,7 @@
 import AppKit
 
 let app = NSApplication.shared
+Settings.register()
 if let index = CommandLine.arguments.firstIndex(of: "--snapshot"), index + 1 < CommandLine.arguments.count {
     Snapshot.run(into: URL(fileURLWithPath: CommandLine.arguments[index + 1]))
 } else {

@@ -24,12 +24,23 @@ struct Ring: View {
 
 struct MenuBarLabel: View {
     @ObservedObject var store: UsageStore
+    @AppStorage(Settings.shows(.claude)) private var showClaude = true
+    @AppStorage(Settings.shows(.codex)) private var showCodex = true
+
+    private func visible(_ provider: Provider) -> Bool {
+        let status = store.status(provider)
+        let wanted = provider == .claude ? showClaude : showCodex
+        return wanted && !status.notLoggedIn && (status.usage != nil || status.error != nil)
+    }
 
     var body: some View {
         HStack(spacing: 9) {
+            if !Provider.allCases.contains(where: visible) {
+                Image(systemName: "gauge.with.dots.needle.33percent").font(.system(size: 14))
+            }
             ForEach(Provider.allCases) { provider in
                 let status = store.status(provider)
-                if !status.notLoggedIn, status.usage != nil || status.error != nil {
+                if visible(provider) {
                     let weekly = status.usage?.weekly
                     let used = weekly?.usedPercent ?? 0
                     HStack(spacing: 4) {

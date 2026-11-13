@@ -11,27 +11,33 @@ struct PanelView: View {
     @ObservedObject var store: UsageStore
     var onResize: () -> Void = {}
     @AppStorage("tab") private var tab: Tab = .overview
+    @ObservedObject var ui: PanelState
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Picker("", selection: $tab) {
-                ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
+            if ui.showSettings {
+                SettingsView(ui: ui)
+            } else {
+                Picker("", selection: $tab) {
+                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
 
-            switch tab {
-            case .overview: OverviewTab(store: store)
-            case .claude: ProviderTab(store: store, provider: .claude)
-            case .codex: ProviderTab(store: store, provider: .codex)
+                switch tab {
+                case .overview: OverviewTab(store: store)
+                case .claude: ProviderTab(store: store, provider: .claude)
+                case .codex: ProviderTab(store: store, provider: .codex)
+                }
             }
 
             Divider()
-            Footer(store: store)
+            Footer(store: store, showSettings: $ui.showSettings)
         }
         .padding(16)
         .frame(width: 440, alignment: .leading)
         .onChange(of: tab) { DispatchQueue.main.async(execute: onResize) }
+        .onChange(of: ui.showSettings) { DispatchQueue.main.async(execute: onResize) }
     }
 }
 
@@ -229,11 +235,13 @@ struct Notice: View {
 
 struct Footer: View {
     @ObservedObject var store: UsageStore
+    @Binding var showSettings: Bool
+    @AppStorage(Settings.refreshMinutes) private var refreshMinutes = 15
 
     var body: some View {
         HStack {
             if let last = store.lastRefresh {
-                Text("Updated \(last.formatted(.relative(presentation: .named)))")
+                Text("Updated \(last.formatted(.relative(presentation: .named))) · every \(refreshMinutes) min")
             } else {
                 Text("Loading…")
             }
@@ -247,6 +255,13 @@ struct Footer: View {
             .buttonStyle(.borderless)
             .help("Refresh now")
             .disabled(store.refreshing)
+            Button {
+                showSettings.toggle()
+            } label: {
+                Image(systemName: showSettings ? "xmark.circle" : "gearshape")
+            }
+            .buttonStyle(.borderless)
+            .help(showSettings ? "Close settings" : "Settings")
         }
         .font(.caption)
         .foregroundStyle(.secondary)

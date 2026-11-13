@@ -40,7 +40,8 @@ final class UsageStore: ObservableObject {
 
     private func tick() {
         now = Date()
-        if let last = lastRefresh, now.timeIntervalSince(last) >= 15 * 60, !refreshing {
+        let minutes = Double(UserDefaults.standard.integer(forKey: Settings.refreshMinutes))
+        if let last = lastRefresh, now.timeIntervalSince(last) >= max(1, minutes) * 60 - 5, !refreshing {
             Task { await refresh() }
         }
     }
