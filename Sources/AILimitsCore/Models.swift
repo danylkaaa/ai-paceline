@@ -59,9 +59,11 @@ public struct ProviderUsage: Codable, Sendable {
 public struct ProviderStatus: Sendable {
     public var usage: ProviderUsage?
     public var error: String?
+    public var notLoggedIn: Bool
 
-    public init(usage: ProviderUsage? = nil, error: String? = nil) {
+    public init(usage: ProviderUsage? = nil, error: String? = nil, notLoggedIn: Bool = false) {
         self.usage = usage
         self.error = error
+        self.notLoggedIn = notLoggedIn
     }
 }

@@ -28,16 +28,17 @@ struct MenuBarLabel: View {
     var body: some View {
         HStack(spacing: 9) {
             ForEach(Provider.allCases) { provider in
-                if let weekly = store.status(provider).usage?.weekly {
+                let status = store.status(provider)
+                if !status.notLoggedIn, status.usage != nil || status.error != nil {
+                    let weekly = status.usage?.weekly
+                    let used = weekly?.usedPercent ?? 0
                     HStack(spacing: 4) {
-                        Ring(usedPercent: weekly.usedPercent,
-                             color: Color(Palette.ring(provider, usedPercent: weekly.usedPercent)))
+                        Ring(usedPercent: used,
+                             color: Color(status.error == nil ? Palette.ring(provider, usedPercent: used) : Palette.unavailable))
                             .frame(width: 15, height: 15)
-                        if let reset = weekly.resetsAt {
-                            Text(ResetText.short(until: reset, now: store.now))
-                                .font(.system(size: 13, weight: .medium))
-                                .monospacedDigit()
-                        }
+                        Text(weekly?.resetsAt.map { ResetText.short(until: $0, now: store.now) } ?? "–")
+                            .font(.system(size: 13, weight: .medium))
+                            .monospacedDigit()
                     }
                 }
             }
