@@ -38,6 +38,7 @@ struct PanelView: View {
                     .background(GeometryReader { geo in
                         Color.clear.preference(key: ContentHeight.self, value: geo.size.height)
                     })
+                    .background(OverlayScroller())
             }
             .frame(height: maxContent)
             .onPreferenceChange(ContentHeight.self) { height in
@@ -67,6 +68,22 @@ struct PanelView: View {
             case .claude: ProviderTab(store: store, provider: .claude, zoom: ui.tokenZoom[.claude]!)
             case .codex: ProviderTab(store: store, provider: .codex, zoom: ui.tokenZoom[.codex]!)
             }
+        }
+    }
+}
+
+/// Makes the enclosing scroll view use overlay scroll bars: hidden until you scroll, and hidden again after,
+/// even when System Settings asks for scroll bars that always show.
+private struct OverlayScroller: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context: Context) {
+        DispatchQueue.main.async {
+            var parent = view.superview
+            while let current = parent, !(current is NSScrollView) { parent = current.superview }
+            guard let scroll = parent as? NSScrollView, scroll.scrollerStyle != .overlay else { return }
+            scroll.scrollerStyle = .overlay
+            scroll.autohidesScrollers = true
         }
     }
 }
