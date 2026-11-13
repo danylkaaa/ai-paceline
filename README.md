@@ -33,7 +33,7 @@ task test       # unit tests
 ```
 
 `task snapshot` is the way to check the UI without clicking: it fetches real data, renders each tab in dark and light
-mode, and exits. Native controls (tab switch, buttons, checkboxes) show as yellow placeholders there.
+mode, and exits. Native controls (buttons, checkboxes, text fields) show as yellow placeholders there.
 
 ## Where the numbers come from
 
@@ -47,7 +47,7 @@ mode, and exits. Native controls (tab switch, buttons, checkboxes) show as yello
 | Weekly % history | Saved on each refresh in `~/Library/Application Support/AILimits/history.json`; Codex history is also read from its session logs |
 | Tokens and estimated cost | `npx ccusage@20.0.50` (`claude daily --instances --breakdown`, `codex daily`) run through a login shell |
 
-- Both usage endpoints are internal, not public APIs. When one fails, the app keeps the last numbers, greys the ring
+- Both usage endpoints are internal, not public APIs. When one fails, the app keeps the last numbers, greys the bar
   and says why in the panel.
 - The app never refreshes login tokens. A refresh would replace Claude Code's or Codex's own token. When a token
   expires, open Claude Code or Codex once.
