@@ -71,7 +71,7 @@ final class UsageStore: ObservableObject {
     }
 
     /// Codex logs every turn's limits, so its weekly history can be filled from them at start.
-    private func backfillCodexHistory() async {
+    func backfillCodexHistory() async {
         let since = Date().addingTimeInterval(-History.keepDays * 86400)
         let points = await Task.detached { CodexHistory.points(from: CodexLogs(), since: since) }.value
         for point in points { history.add(point) }

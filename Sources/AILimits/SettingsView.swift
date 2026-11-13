@@ -7,12 +7,15 @@ enum Settings {
     static let refreshChoices = [5, 15, 30, 60]
 
     static func shows(_ provider: Provider) -> String { "show-\(provider.rawValue)" }
+    static func price(_ provider: Provider) -> String { "price-\(provider.rawValue)" }
 
     static func register() {
         UserDefaults.standard.register(defaults: [
             refreshMinutes: 15,
             shows(.claude): true,
             shows(.codex): true,
+            price(.claude): 240.0,
+            price(.codex): 22.0,
         ])
     }
 }
@@ -23,6 +26,10 @@ final class PanelState: ObservableObject {
     @Published var showSettings = false
     @Published var startAtLogin = SMAppService.mainApp.status == .enabled
     @Published var loginNote: String?
+    @Published var contentHeight: CGFloat = 300
+    @Published var maxPanelHeight: CGFloat = 800
+    /// Off only for snapshots: ImageRenderer does not draw ScrollView contents.
+    var scrolls = true
 }
 
 struct SettingsView: View {
@@ -30,6 +37,8 @@ struct SettingsView: View {
     @AppStorage(Settings.refreshMinutes) private var refreshMinutes = 15
     @AppStorage(Settings.shows(.claude)) private var showClaude = true
     @AppStorage(Settings.shows(.codex)) private var showCodex = true
+    @AppStorage(Settings.price(.claude)) private var claudePrice = 240.0
+    @AppStorage(Settings.price(.codex)) private var codexPrice = 22.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -44,6 +53,12 @@ struct SettingsView: View {
                 Text("Show in menu bar").font(.callout)
                 Toggle("Claude", isOn: $showClaude)
                 Toggle("Codex", isOn: $showCodex)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Monthly price (servers do not report it)").font(.callout)
+                PriceField(label: "Claude", value: $claudePrice)
+                PriceField(label: "ChatGPT", value: $codexPrice)
             }
 
             VStack(alignment: .leading, spacing: 4) {
@@ -66,6 +81,21 @@ struct SettingsView: View {
         } catch {
             ui.loginNote = "Could not change: \(error.localizedDescription)"
             log.error("login item change failed error=\(String(describing: error), privacy: .public)")
+        }
+    }
+}
+
+struct PriceField: View {
+    var label: String
+    @Binding var value: Double
+
+    var body: some View {
+        HStack {
+            Text(label).frame(width: 70, alignment: .leading)
+            TextField("", value: $value, format: .currency(code: "USD"))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 100)
+            Text("/ month").foregroundStyle(.secondary)
         }
     }
 }

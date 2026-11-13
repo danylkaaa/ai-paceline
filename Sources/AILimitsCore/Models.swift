@@ -44,13 +44,20 @@ public struct ProviderUsage: Codable, Sendable {
     public var limits: [Limit]
     public var breakdown: [Share]
     public var fetchedAt: Date
+    /// Next subscription renewal, when the server reports it.
+    public var renewsAt: Date?
+    /// True when `renewsAt` is a guess from the subscription start (Claude reports no renewal date).
+    /// Optional so history files saved before this field still decode.
+    public var renewalEstimated: Bool?
 
-    public init(provider: Provider, plan: String?, limits: [Limit], breakdown: [Share] = [], fetchedAt: Date) {
+    public init(provider: Provider, plan: String?, limits: [Limit], breakdown: [Share] = [], fetchedAt: Date,
+                renewsAt: Date? = nil) {
         self.provider = provider
         self.plan = plan
         self.limits = limits
         self.breakdown = breakdown
         self.fetchedAt = fetchedAt
+        self.renewsAt = renewsAt
     }
 
     public var weekly: Limit? { limits.first { $0.id == Limit.weeklyID } }

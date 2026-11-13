@@ -4,7 +4,8 @@ import SwiftUI
 /// Borderless floating panel under the menu bar item; it takes clicks without activating the app.
 @MainActor
 final class HoverPanel: NSPanel {
-    private var host: NSHostingView<PanelView>!
+    private var host: FirstClickHostingView<PanelView>!
+    var onResignKey: () -> Void = {}
     private let ui = PanelState()
 
     init(store: UsageStore) {
@@ -25,7 +26,7 @@ final class HoverPanel: NSPanel {
         background.wantsLayer = true
         background.layer?.cornerRadius = 14
         background.layer?.masksToBounds = true
-        host = NSHostingView(rootView: PanelView(store: store, onResize: { [weak self] in self?.refit() }, ui: ui))
+        host = FirstClickHostingView(rootView: PanelView(store: store, onResize: { [weak self] in self?.refit() }, ui: ui))
         host.translatesAutoresizingMaskIntoConstraints = false
         background.addSubview(host)
         NSLayoutConstraint.activate([
@@ -39,6 +40,11 @@ final class HoverPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
+    override func resignKey() {
+        super.resignKey()
+        onResignKey()
+    }
+
     /// Fits the panel to its content and keeps its top edge in place.
     func refit() {
         guard isVisible else { return }
@@ -48,10 +54,16 @@ final class HoverPanel: NSPanel {
 
     /// Fits the panel to its content and places it under `anchor`, inside the screen.
     func resize(anchor: NSRect) {
-        let size = host.fittingSize
         let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: anchor.midX, y: anchor.midY)) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? .zero
+        ui.maxPanelHeight = visible.height - 16
+        let size = host.fittingSize
         let x = min(max(visible.minX + 8, anchor.midX - size.width / 2), visible.maxX - size.width - 8)
         setFrame(NSRect(x: x, y: anchor.minY - size.height - 6, width: size.width, height: size.height), display: true)
     }
+}
+
+/// Acts on the first click even when the panel is not the key window, so tabs switch on one click.
+final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

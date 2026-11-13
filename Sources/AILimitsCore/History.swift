@@ -72,11 +72,17 @@ public struct HistoryFile: Sendable {
             .appendingPathComponent("AILimits/history.json")
     }
 
+    /// Loads the saved history. A file that does not decode is moved to `history.json.bak`, so a format change
+    /// never silently overwrites old data.
     public func load() -> History {
         guard let data = try? Data(contentsOf: url) else { return History() }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .secondsSince1970
-        return (try? decoder.decode(History.self, from: data)) ?? History()
+        if let history = try? decoder.decode(History.self, from: data) { return history }
+        let backup = url.appendingPathExtension("bak")
+        try? FileManager.default.removeItem(at: backup)
+        try? FileManager.default.moveItem(at: url, to: backup)
+        return History()
     }
 
     public func save(_ history: History) throws {

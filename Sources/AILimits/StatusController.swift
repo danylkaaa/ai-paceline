@@ -1,3 +1,4 @@
+import AILimitsCore
 import AppKit
 import Combine
 import SwiftUI
@@ -14,9 +15,13 @@ final class StatusController: NSObject {
     private var closeTimer: Timer?
     private var lastInside = Date()
     private var clickMonitor: Any?
+    private var closedAt = Date.distantPast
     private var subscriptions: [AnyCancellable] = []
 
+    private let store: UsageStore
+
     init(store: UsageStore) {
+        self.store = store
         label = PassThroughHostingView(rootView: MenuBarLabel(store: store))
         panel = HoverPanel(store: store)
         super.init()
@@ -36,6 +41,7 @@ final class StatusController: NSObject {
         }
         tracker.onEnter = { [weak self] in self?.pointerEntered() }
         tracker.onExit = { [weak self] in self?.openWork?.cancel() }
+        panel.onResignKey = { [weak self] in self?.close() }
 
         store.objectWillChange
             .receive(on: RunLoop.main)
@@ -50,7 +56,16 @@ final class StatusController: NSObject {
 
     private func relayout() {
         item.length = max(24, label.fittingSize.width)
+        item.button?.toolTip = tooltip()
         if panel.isVisible { DispatchQueue.main.async { self.panel.refit() } }
+    }
+
+    private func tooltip() -> String {
+        Provider.allCases.compactMap { provider -> String? in
+            guard let weekly = store.status(provider).usage?.weekly else { return nil }
+            let reset = weekly.resetsAt.map { ", resets in \(ResetText.long(until: $0, now: Date()))" } ?? ""
+            return "\(provider.name) \(Int(weekly.leftPercent.rounded()))% left\(reset)"
+        }.joined(separator: "\n")
     }
 
     private var statusFrame: NSRect { item.button?.window?.frame ?? .zero }
@@ -67,6 +82,8 @@ final class StatusController: NSObject {
 
     @objc private func clicked() {
         if panel.isVisible && pinned { close(); return }
+        // A click on the item first takes key focus from the panel, which closes it; do not reopen at once.
+        if Date().timeIntervalSince(closedAt) < 0.3 { return }
         show(pinned: true)
     }
 
@@ -97,6 +114,7 @@ final class StatusController: NSObject {
     }
 
     private func close() {
+        if panel.isVisible { closedAt = Date() }
         pinned = false
         closeTimer?.invalidate()
         closeTimer = nil

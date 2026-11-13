@@ -15,20 +15,27 @@ struct PanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if ui.showSettings {
-                SettingsView(ui: ui)
-            } else {
-                Picker("", selection: $tab) {
-                    ForEach(Tab.allCases) { Text($0.rawValue).tag($0) }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
+            if !ui.showSettings { TabBar(tab: $tab) }
 
-                switch tab {
-                case .overview: OverviewTab(store: store)
-                case .claude: ProviderTab(store: store, provider: .claude)
-                case .codex: ProviderTab(store: store, provider: .codex)
+            if !ui.scrolls {
+                content
+            } else {
+            // The scroll area takes the content's height, up to what fits on screen.
+            ScrollView(.vertical) {
+                content
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(GeometryReader { geo in
+                        Color.clear.preference(key: ContentHeight.self, value: geo.size.height)
+                    })
+            }
+            .frame(height: min(ui.contentHeight, max(200, ui.maxPanelHeight - 130)))
+            .onPreferenceChange(ContentHeight.self) { height in
+                MainActor.assumeIsolated {
+                    guard abs(ui.contentHeight - height) > 0.5 else { return }
+                    ui.contentHeight = height
+                    DispatchQueue.main.async(execute: onResize)
                 }
+            }
             }
 
             Divider()
@@ -36,9 +43,68 @@ struct PanelView: View {
         }
         .padding(16)
         .frame(width: 440, alignment: .leading)
-        .onChange(of: tab) { DispatchQueue.main.async(execute: onResize) }
-        .onChange(of: ui.showSettings) { DispatchQueue.main.async(execute: onResize) }
     }
+
+    @ViewBuilder private var content: some View {
+        if ui.showSettings {
+            SettingsView(ui: ui)
+        } else {
+            switch tab {
+            case .overview: OverviewTab(store: store)
+            case .claude: ProviderTab(store: store, provider: .claude)
+            case .codex: ProviderTab(store: store, provider: .codex)
+            }
+        }
+    }
+}
+
+private struct ContentHeight: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Tabs as plain buttons: one click switches, even while the panel is not the key window.
+struct TabBar: View {
+    @Binding var tab: Tab
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(Tab.allCases) { t in
+                TabButton(title: t.rawValue, selected: t == tab) { tab = t }
+                    .help("Click to show \(t == .overview ? "both providers" : t.rawValue)")
+            }
+        }
+        .padding(3)
+        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+struct TabButton: View {
+    var title: String
+    var selected: Bool
+    var action: () -> Void
+    @StateObject private var hover = HoverFlag()
+
+    var body: some View {
+        Text(title)
+            .font(.callout.weight(selected ? .semibold : .regular))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(selected ? AnyShapeStyle(.background.opacity(0.9))
+                          : hover.on ? AnyShapeStyle(.primary.opacity(0.08)) : AnyShapeStyle(.clear))
+                    .shadow(color: .black.opacity(selected ? 0.15 : 0), radius: 1, y: 0.5)
+            )
+            .contentShape(Rectangle())
+            .onHover { hover.on = $0; if $0 { NSCursor.pointingHand.set() } else { NSCursor.arrow.set() } }
+            .onTapGesture(perform: action)
+    }
+}
+
+@MainActor
+final class HoverFlag: ObservableObject {
+    @Published var on = false
 }
 
 // MARK: - Overview
@@ -53,7 +119,7 @@ struct OverviewTab: View {
                     SummaryCard(provider: provider, status: store.status(provider), now: store.now)
                 }
             }
-            Section(title: "Weekly limit used, last 7 days") {
+            Section(title: "Weekly limit left, last 7 days") {
                 OverviewChart(history: store.history, now: store.now)
             }
         }
@@ -69,9 +135,12 @@ struct SummaryCard: View {
         let weekly = status.usage?.weekly
         let used = weekly?.usedPercent ?? 0
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Text(provider.name).font(.headline)
-                if let plan = status.usage?.plan { Text(plan).font(.caption).foregroundStyle(.secondary) }
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(provider.name).font(.headline)
+                    if let plan = status.usage?.plan { Text(plan).font(.caption).foregroundStyle(.secondary) }
+                }
+                SubscriptionText(provider: provider, usage: status.usage).font(.caption2).foregroundStyle(.secondary)
             }
             HStack(spacing: 12) {
                 ZStack {
@@ -115,6 +184,8 @@ struct ProviderTab: View {
                     Text(plan).font(.caption.weight(.medium)).padding(.horizontal, 6).padding(.vertical, 2)
                         .background(Color(Palette.base(provider)).opacity(0.18), in: Capsule())
                 }
+                Spacer()
+                SubscriptionText(provider: provider, usage: status.usage).font(.caption).foregroundStyle(.secondary)
             }
             if status.notLoggedIn {
                 Notice(text: UsageError.notLoggedIn(provider).localizedDescription)
@@ -205,6 +276,26 @@ struct ShareBar: View {
 
     private func shade(_ index: Int) -> Color {
         Color(Palette.base(provider)).opacity(max(0.3, 1 - Double(index) * 0.3))
+    }
+}
+
+/// "$240/mo · renews 11 Dec"; "~" marks a renewal date guessed from the subscription start.
+struct SubscriptionText: View {
+    var provider: Provider
+    var usage: ProviderUsage?
+    @AppStorage(Settings.price(.claude)) private var claudePrice = 240.0
+    @AppStorage(Settings.price(.codex)) private var codexPrice = 22.0
+
+    var body: some View {
+        let price = provider == .claude ? claudePrice : codexPrice
+        var parts: [String] = []
+        if price > 0 { parts.append("\(Fmt.money(price, short: price.rounded() == price))/mo") }
+        if let renews = usage?.renewsAt {
+            let estimated = usage?.renewalEstimated == true
+            parts.append("renews \(estimated ? "~" : "")\(renews.formatted(.dateTime.day().month(.abbreviated)))")
+        }
+        return Text(parts.joined(separator: " · "))
+            .help(usage?.renewalEstimated == true ? "Renewal date guessed from the day your subscription started." : "")
     }
 }
 

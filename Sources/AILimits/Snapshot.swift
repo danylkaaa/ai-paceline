@@ -7,7 +7,9 @@ enum Snapshot {
     static func run(into dir: URL) {
         let store = UsageStore()
         let ui = PanelState()
+        ui.scrolls = false
         Task {
+            await store.backfillCodexHistory()
             await store.refresh()
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             for scheme in [ColorScheme.dark, .light] {

@@ -21,6 +21,14 @@ public enum CodexUsageParser {
         return ProviderUsage(provider: .codex, plan: r.planType.map(capitalized), limits: windows, fetchedAt: now)
     }
 
+    /// Next renewal from the ChatGPT subscriptions endpoint; nil when the plan will not renew.
+    public static func renewal(_ data: Data) -> Date? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              root["will_renew"] as? Bool ?? true else { return nil }
+        let entitlement = root["entitlement"] as? [String: Any]
+        return DateParsing.iso(entitlement?["renews_at"] as? String) ?? DateParsing.iso(root["active_until"] as? String)
+    }
+
     /// Parses the newest `rate_limits` object of a Codex session log line.
     public static func parseLogLine(_ line: String, now: Date) -> ProviderUsage? {
         guard line.contains("\"rate_limits\""),
@@ -81,14 +89,24 @@ public struct CodexClient: Sendable {
               let tokens = root["tokens"] as? [String: Any],
               let token = tokens["access_token"] as? String else { throw UsageError.notLoggedIn(.codex) }
 
-        var request = URLRequest(url: URL(string: "https://chatgpt.com/backend-api/wham/usage")!, timeoutInterval: 20)
+        let account = tokens["account_id"] as? String
+        async let subscription = try? get("https://chatgpt.com/backend-api/subscriptions?account_id=\(account ?? "")",
+                                          token: token, account: account)
+        var usage = try CodexUsageParser.parse(
+            try await get("https://chatgpt.com/backend-api/wham/usage", token: token, account: account), now: now)
+        usage.renewsAt = (await subscription).flatMap(CodexUsageParser.renewal)
+        return usage
+    }
+
+    private func get(_ url: String, token: String, account: String?) async throws -> Data {
+        var request = URLRequest(url: URL(string: url)!, timeoutInterval: 20)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("codex-cli", forHTTPHeaderField: "User-Agent")
-        if let account = tokens["account_id"] as? String { request.setValue(account, forHTTPHeaderField: "ChatGPT-Account-Id") }
+        if let account { request.setValue(account, forHTTPHeaderField: "ChatGPT-Account-Id") }
         let (body, response) = try await URLSession.shared.data(for: request)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard code == 200 else { throw UsageError.http(.codex, code) }
-        return try CodexUsageParser.parse(body, now: now)
+        return body
     }
 
     func newestFromLogs(now: Date) -> ProviderUsage? {

@@ -34,27 +34,36 @@ struct MenuBarLabel: View {
     }
 
     var body: some View {
-        HStack(spacing: 9) {
-            if !Provider.allCases.contains(where: visible) {
-                Image(systemName: "gauge.with.dots.needle.33percent").font(.system(size: 14))
-            }
-            ForEach(Provider.allCases) { provider in
-                let status = store.status(provider)
-                if visible(provider) {
-                    let weekly = status.usage?.weekly
-                    let used = weekly?.usedPercent ?? 0
-                    HStack(spacing: 4) {
-                        Ring(usedPercent: used,
-                             color: Color(status.error == nil ? Palette.ring(provider, usedPercent: used) : Palette.unavailable))
-                            .frame(width: 15, height: 15)
-                        Text(weekly?.resetsAt.map { ResetText.short(until: $0, now: store.now) } ?? "–")
-                            .font(.system(size: 13, weight: .medium))
-                            .monospacedDigit()
+        Group {
+            if Provider.allCases.contains(where: visible) {
+                // One bar per provider, Claude on top: the fill is the weekly limit used.
+                VStack(spacing: 3) {
+                    ForEach(Provider.allCases.filter(visible)) { provider in
+                        let status = store.status(provider)
+                        let used = status.usage?.weekly?.usedPercent ?? 0
+                        LevelBar(usedPercent: used,
+                                 color: Color(status.error == nil ? Palette.ring(provider, usedPercent: used) : Palette.unavailable))
                     }
                 }
+            } else {
+                Image(systemName: "gauge.with.dots.needle.33percent").font(.system(size: 14))
             }
         }
-        .padding(.horizontal, 5)
+        .padding(.horizontal, 6)
+        .frame(height: 22)
         .fixedSize()
+    }
+}
+
+struct LevelBar: View {
+    var usedPercent: Double
+    var color: Color
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Capsule().fill(.primary.opacity(0.22))
+            Capsule().fill(color).frame(width: max(3, 22 * min(1, usedPercent / 100)))
+        }
+        .frame(width: 22, height: 4)
     }
 }
