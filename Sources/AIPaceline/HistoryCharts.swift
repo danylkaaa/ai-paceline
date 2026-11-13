@@ -131,56 +131,86 @@ struct OverviewChart: View {
     var now: Date
     @ObservedObject var zoom: ChartZoom
 
-    var body: some View {
-        let range = zoom.range(endingAt: now)
-        let from = range.lowerBound
-        VStack(alignment: .leading, spacing: 6) {
-        Chart {
-            ForEach(Provider.allCases) { provider in
-                ForEach(history.windows(provider).filter { $0.resetsAt > from && $0.start < range.upperBound }) { w in
-                    ForEach(Segments.split(Self.visible(w.leftLine(now: now), from: from), maxGap: maxGap)) { seg in
-                        ForEach(seg.points, id: \.at) { p in
-                            LineMark(x: .value("Time", p.at), y: .value("Left", p.value),
-                                     series: .value("Line", "\(provider.name)-\(w.resetsAt.timeIntervalSince1970)-\(seg.id)"))
-                                .foregroundStyle(by: .value("Provider", provider.name))
-                                .lineStyle(seg.dashed ? dashed : solid)
-                        }
-                    }
+    /// One drawable run of one weekly window of one provider.
+    private struct Line: Identifiable {
+        var id: String
+        var provider: String
+        var segment: LineSegment
+    }
+
+    private var range: ClosedRange<Date> { zoom.range(endingAt: now) }
+
+    /// Flattened ahead of the chart: nested ForEach over providers, windows and segments is more than older
+    /// compilers can type-check in time.
+    private var lines: [Line] {
+        let from = range.lowerBound, to = range.upperBound
+        var result: [Line] = []
+        for provider in Provider.allCases {
+            for w in history.windows(provider) where w.resetsAt > from && w.start < to {
+                let points = Self.visible(w.leftLine(now: now), from: from)
+                for seg in Segments.split(points, maxGap: maxGap) {
+                    let id = "\(provider.name)-\(w.resetsAt.timeIntervalSince1970)-\(seg.id)"
+                    result.append(Line(id: id, provider: provider.name, segment: seg))
                 }
             }
+        }
+        return result
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            chart
+            ZoomHint(zoom: zoom)
+        }
+    }
+
+    private var chart: some View {
+        Chart(lines) { line in
+            lineMarks(line)
         }
         .chartForegroundStyleScale(["Claude": Color(Palette.base(.claude)), "Codex": Color(Palette.base(.codex))])
         .chartXScale(domain: range)
         .chartPlotStyle { $0.clipped() }
         .chartYScale(domain: 0...100)
-        .chartXAxis {
-            if zoom.days <= 2 {
-                AxisMarks(values: .stride(by: .hour, count: 6)) { _ in
-                    AxisGridLine().foregroundStyle(.quaternary)
-                    AxisValueLabel(format: .dateTime.hour(), anchor: .topLeading)
-                }
-            } else if zoom.days <= 7 {
-                AxisMarks(values: .stride(by: .day)) { _ in
-                    AxisGridLine().foregroundStyle(.quaternary)
-                    AxisValueLabel(format: .dateTime.weekday(.abbreviated), anchor: .topLeading)
-                }
-            } else {
-                AxisMarks(values: Self.dateTicks(range, every: zoom.days / 5)) { _ in
-                    AxisGridLine().foregroundStyle(.quaternary)
-                    AxisValueLabel(format: .dateTime.day().month(.abbreviated), anchor: .topLeading)
-                }
-            }
-        }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: [0, 50, 100]) { value in
-                AxisGridLine().foregroundStyle(.quaternary)
-                AxisValueLabel { if let v = value.as(Int.self) { Text("\(v)%") } }
-            }
-        }
+        .chartXAxis { timeAxis }
+        .chartYAxis { percentAxis }
         .chartLegend(position: .bottom, alignment: .leading)
         .frame(height: 140)
         .zoomable(zoom)
-        ZoomHint(zoom: zoom)
+    }
+
+    @ChartContentBuilder private func lineMarks(_ line: Line) -> some ChartContent {
+        let style: StrokeStyle = line.segment.dashed ? dashed : solid
+        ForEach(line.segment.points, id: \.at) { (p: ChartPoint) in
+            LineMark(x: .value("Time", p.at), y: .value("Left", p.value), series: .value("Line", line.id))
+                .foregroundStyle(by: .value("Provider", line.provider))
+                .lineStyle(style)
+        }
+    }
+
+    @AxisContentBuilder private var timeAxis: some AxisContent {
+        if zoom.days <= 2 {
+            AxisMarks(values: .stride(by: .hour, count: 6)) { _ in
+                AxisGridLine().foregroundStyle(.quaternary)
+                AxisValueLabel(format: .dateTime.hour(), anchor: .topLeading)
+            }
+        } else if zoom.days <= 7 {
+            AxisMarks(values: .stride(by: .day)) { _ in
+                AxisGridLine().foregroundStyle(.quaternary)
+                AxisValueLabel(format: .dateTime.weekday(.abbreviated), anchor: .topLeading)
+            }
+        } else {
+            AxisMarks(values: Self.dateTicks(range, every: zoom.days / 5)) { _ in
+                AxisGridLine().foregroundStyle(.quaternary)
+                AxisValueLabel(format: .dateTime.day().month(.abbreviated), anchor: .topLeading)
+            }
+        }
+    }
+
+    private var percentAxis: some AxisContent {
+        AxisMarks(position: .leading, values: [0, 50, 100]) { value in
+            AxisGridLine().foregroundStyle(.quaternary)
+            AxisValueLabel { if let v = value.as(Int.self) { Text("\(v)%") } }
         }
     }
 
