@@ -48,17 +48,22 @@ public struct History: Codable, Sendable {
         points.removeAll { $0.at < cutoff }
     }
 
-    /// Weekly windows of a provider, newest last. Reset times are grouped to the hour, as servers jitter them.
+    /// Weekly windows of a provider, oldest first. Servers jitter reset times by seconds, so resets less than
+    /// an hour apart belong to one window.
     public func windows(_ provider: Provider, windowSeconds: TimeInterval = 7 * 86400) -> [UsageWindow] {
-        var groups: [Date: [HistoryPoint]] = [:]
-        for p in points where p.provider == provider {
-            let key = Date(timeIntervalSince1970: (p.resetsAt.timeIntervalSince1970 / 3600).rounded() * 3600)
-            groups[key, default: []].append(p)
+        var groups: [[HistoryPoint]] = []
+        for p in points.filter({ $0.provider == provider }).sorted(by: { $0.resetsAt < $1.resetsAt }) {
+            if let last = groups.last?.last, p.resetsAt.timeIntervalSince(last.resetsAt) < 3600 {
+                groups[groups.count - 1].append(p)
+            } else {
+                groups.append([p])
+            }
         }
-        return groups.map { reset, pts in
-            UsageWindow(start: reset.addingTimeInterval(-windowSeconds), resetsAt: reset, points: pts.sorted { $0.at < $1.at })
+        return groups.compactMap { pts in
+            guard let reset = pts.map(\.resetsAt).max() else { return nil }
+            return UsageWindow(start: reset.addingTimeInterval(-windowSeconds), resetsAt: reset,
+                               points: pts.sorted { $0.at < $1.at })
         }
-        .sorted { $0.resetsAt < $1.resetsAt }
     }
 }
 

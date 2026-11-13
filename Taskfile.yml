@@ -33,7 +33,8 @@ tasks:
   test:
     desc: Run unit tests
     cmds:
-      - swift test --quiet
+      # The Command Line Tools do not pass the Swift Testing macro plugin to the compiler by themselves.
+      - swift test --quiet -Xswiftc -plugin-path -Xswiftc /Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing
 
   snapshot:
     desc: Render each panel tab with real data into build/snapshots

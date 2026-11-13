@@ -7,5 +7,6 @@ let package = Package(
     targets: [
         .target(name: "AILimitsCore"),
         .executableTarget(name: "AILimits", dependencies: ["AILimitsCore"]),
+        .testTarget(name: "AILimitsCoreTests", dependencies: ["AILimitsCore"]),
     ]
 )

@@ -127,12 +127,16 @@ public enum CCUsage {
 }
 
 public enum ModelName {
-    /// "claude-opus-5-5" → "Opus 5.5"; other names stay as they are.
+    /// "claude-opus-5-5" → "Opus 5.5", "claude-3-5-sonnet-20241022" → "Sonnet 3.5"; other names stay as they are.
     public static func short(_ name: String) -> String {
         guard name.hasPrefix("claude-") else { return name }
         let parts = name.dropFirst("claude-".count).split(separator: "-")
-        guard let family = parts.first else { return name }
-        let version = parts.dropFirst().prefix { $0.allSatisfy(\.isNumber) && $0.count <= 2 }.joined(separator: ".")
+        guard let familyIndex = parts.firstIndex(where: { $0.contains(where: \.isLetter) }) else { return name }
+        let family = parts[familyIndex]
+        let isVersion = { (p: Substring) in p.allSatisfy(\.isNumber) && p.count <= 2 }
+        let after = parts[(familyIndex + 1)...].prefix(while: isVersion)
+        let before = parts[..<familyIndex].filter(isVersion)
+        let version = (after.isEmpty ? Array(before) : Array(after)).joined(separator: ".")
         let title = family.prefix(1).uppercased() + family.dropFirst()
         return version.isEmpty ? title : "\(title) \(version)"
     }
@@ -146,7 +150,14 @@ public enum ProjectPath {
     }
 
     public static func resolve(_ encoded: String, exists: (String) -> Bool) -> String {
-        let parts = encoded.split(separator: "-", omittingEmptySubsequences: false).dropFirst().map(String.init)
+        // "--name" is "/.name": an empty part marks a hidden folder.
+        var parts: [String] = []
+        var hidden = false
+        for part in encoded.split(separator: "-", omittingEmptySubsequences: false).dropFirst() {
+            if part.isEmpty { hidden = true; continue }
+            parts.append(hidden ? "." + part : String(part))
+            hidden = false
+        }
         var path = ""
         var i = 0
         while i < parts.count {
