@@ -39,7 +39,10 @@ struct PanelView: View {
                         Color.clear.preference(key: ContentHeight.self, value: geo.size.height)
                     })
                     .background(OverlayScroller())
+                    // Content keeps the panel's 16 pt margin; the scroll bar sits in that margin, not over the content.
+                    .padding(.horizontal, 16)
             }
+            .padding(.horizontal, -16)
             .frame(height: maxContent)
             .onPreferenceChange(ContentHeight.self) { height in
                 MainActor.assumeIsolated { contentHeightChanged(height) }
