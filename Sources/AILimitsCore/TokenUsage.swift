@@ -143,7 +143,7 @@ public enum ModelName {
 }
 
 public enum ProjectPath {
-    /// Claude Code stores projects as the folder path with "/" (and ".") replaced by "-".
+    /// Claude Code stores projects as the folder path with "/" and "." replaced by "-", so "/.name" becomes "--name".
     /// Walks the disk to find the real folder; falls back to the encoded name.
     public static func resolve(_ encoded: String) -> String {
         resolve(encoded, exists: { FileManager.default.fileExists(atPath: $0) })
@@ -164,7 +164,7 @@ public enum ProjectPath {
             var matched = false
             for j in stride(from: parts.count, to: i, by: -1) {
                 let name = parts[i..<j].joined(separator: "-")
-                for candidate in [path + "/" + name, path + "/." + name] where exists(candidate) {
+                for candidate in [path + "/" + name] where exists(candidate) {
                     path = candidate
                     i = j
                     matched = true

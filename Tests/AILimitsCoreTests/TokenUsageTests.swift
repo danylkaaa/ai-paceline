@@ -257,4 +257,15 @@ import Testing
         // assert
         #expect(path == "/Users/demo/.config/app")
     }
+
+    @Test func projectPathResolveKeepsAGoneVisibleFolderWhenAHiddenOneHasTheSameName() {
+        // arrange
+        let existing: Set<String> = ["/Users", "/Users/demo", "/Users/demo/.claude"]
+
+        // act
+        let path = ProjectPath.resolve("-Users-demo-claude", exists: { existing.contains($0) })
+
+        // assert
+        #expect(path == "/Users/demo/claude")
+    }
 }
