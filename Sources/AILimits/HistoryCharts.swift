@@ -25,6 +25,7 @@ struct WeekChart: View {
             + [ChartPoint(at: now, value: current.usedPercent)]
         let color = Color(Palette.base(provider))
 
+        VStack(alignment: .leading, spacing: 6) {
         Chart {
             ForEach([0.0, 7.0], id: \.self) { day in
                 LineMark(x: .value("Day", day), y: .value("Used", day / 7 * 100), series: .value("Line", "even"))
@@ -81,6 +82,14 @@ struct WeekChart: View {
             }
         }
         .frame(height: 140)
+        HStack(spacing: 14) {
+            LegendItem(label: "This week", color: color, style: StrokeStyle(lineWidth: 2.2))
+            if !past.isEmpty {
+                LegendItem(label: "Earlier weeks", color: .secondary.opacity(0.5), style: StrokeStyle(lineWidth: 1.2))
+            }
+            LegendItem(label: "Even use", color: .secondary, style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+        }
+        }
     }
 
     private func days(_ date: Date, from start: Date) -> Double {
@@ -158,5 +167,23 @@ struct OverviewChart: View {
     private static func visible(_ line: [ChartPoint], from: Date) -> [ChartPoint] {
         guard let firstInside = line.firstIndex(where: { $0.at >= from }) else { return [] }
         return Array(line[max(0, firstInside - 1)...])
+    }
+}
+
+struct LegendItem: View {
+    var label: String
+    var color: Color
+    var style: StrokeStyle
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Path { p in
+                p.move(to: CGPoint(x: 0, y: 4))
+                p.addLine(to: CGPoint(x: 16, y: 4))
+            }
+            .stroke(color, style: style)
+            .frame(width: 16, height: 8)
+            Text(label).font(.caption2).foregroundStyle(.secondary)
+        }
     }
 }
