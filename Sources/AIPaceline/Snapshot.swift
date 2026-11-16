@@ -14,7 +14,7 @@ enum Snapshot {
         ui.scrolls = false
         Task {
             await store.backfillCodexHistory()
-            await store.refresh()
+            await store.refresh(waitForTokens: true)
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             for scheme in [ColorScheme.dark, .light] {
                 for (name, tab, settings) in Tab.allCases.map({ ($0.rawValue.lowercased(), $0, false) }) + [("settings", Tab.overview, true)] {
