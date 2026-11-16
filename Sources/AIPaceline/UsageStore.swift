@@ -10,6 +10,7 @@ final class UsageStore: ObservableObject {
     @Published var codex = ProviderStatus()
     @Published var now = Date()
     @Published var refreshing = false
+    private var refreshingTokens = false
     @Published var lastRefresh: Date?
     @Published var tokens: [Provider: TokenUsage] = [:]
     @Published var tokenErrors: [Provider: String] = [:]
@@ -51,12 +52,21 @@ final class UsageStore: ObservableObject {
     private func tick() {
         now = Date()
         let minutes = Double(AppDefaults.store.integer(forKey: Settings.refreshMinutes))
-        if let last = lastRefresh, now.timeIntervalSince(last) >= max(1, minutes) * 60 - 5, !refreshing {
+        guard let last = lastRefresh, !refreshing else { return }
+        if now.timeIntervalSince(last) >= max(1, minutes) * 60 - 5 || resetPassed(since: last) {
             Task { await refresh() }
         }
     }
 
-    func refresh() async {
+    /// A shown limit reached its reset time after the last refresh, so its numbers are old.
+    private func resetPassed(since last: Date) -> Bool {
+        [claude, codex].compactMap(\.usage).flatMap(\.limits).contains { limit in
+            guard let reset = limit.resetsAt else { return false }
+            return reset <= now && reset > last
+        }
+    }
+
+    func refresh(waitForTokens: Bool = false) async {
         if Launch.demo { now = Date(); lastRefresh = now; return }
         guard !refreshing else { return }
         refreshing = true
@@ -70,7 +80,7 @@ final class UsageStore: ObservableObject {
         saveHistory()
         now = Date()
         lastRefresh = now
-        await refreshTokens()
+        if waitForTokens { await refreshTokens() } else { Task { await refreshTokens() } }
     }
 
     private func saveHistory() {
@@ -90,7 +100,11 @@ final class UsageStore: ObservableObject {
         saveHistory()
     }
 
+    /// Runs apart from `refresh`: ccusage can take minutes, and the limits must not wait for it.
     private func refreshTokens() async {
+        guard !refreshingTokens else { return }
+        refreshingTokens = true
+        defer { refreshingTokens = false }
         async let c = Self.loadTokens(.claude) { try await CCUsage.claude(days: 60) }
         async let x = Self.loadTokens(.codex) { try await CCUsage.codex(days: 60) }
         for (provider, result) in await [(Provider.claude, c), (.codex, x)] {
